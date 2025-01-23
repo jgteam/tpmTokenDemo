@@ -28,7 +28,8 @@ TSS2_RC read_public_info(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE handle, TSS2L
 
 
 
-    TSS2_RC rc = Tss2_Sys_ReadPublic(sysContext, handle, &sessionsData, &outPublic, &name, &qualifiedName, &sessionsDataOut);
+    TSS2L_SYS_AUTH_COMMAND * nullCmdAuths = NULL;  // no auth for command
+    TSS2_RC rc = Tss2_Sys_ReadPublic(sysContext, handle, nullCmdAuths, &outPublic, &name, &qualifiedName, &sessionsDataOut);
     if (rc == TPM2_RC_HANDLE) {
         std::cerr << "Handle not found." << std::endl;
         return rc;
@@ -198,7 +199,7 @@ bool is_scheme_available(TSS2_SYS_CONTEXT *sysContext, TPM2_ALG_ID scheme) {
     return false;
 }
 
-TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, TPM2_HANDLE &rsaHandle, TPM2B_PUBLIC &outPublic, TPM2B_PRIVATE &outPrivate, TSS2L_SYS_AUTH_COMMAND &sessionsData) {
+TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, TPM2_HANDLE temporaryRsaHandle, TPM2_HANDLE &rsaHandle, TPM2B_PUBLIC &outPublic, TPM2B_PRIVATE &outPrivate, TSS2L_SYS_AUTH_COMMAND &sessionsData) {
     TPM2B_SENSITIVE_CREATE inSensitive = {};
     TPM2B_PUBLIC inPublic = {};
     TPM2B_DATA outsideInfo = {};
@@ -208,7 +209,6 @@ TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, 
     TPMT_TK_CREATION creationTicket = {};
     TSS2L_SYS_AUTH_RESPONSE sessionsDataOut = {};
     TPM2B_NAME name = {};  // Declare the name variable
-    TPM2_HANDLE temporaryRsaHandle;
 
     // Set up sensitive data
     inSensitive.size = sizeof(TPM2B_SENSITIVE_CREATE);
@@ -243,13 +243,13 @@ TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, 
 
     inPublic.publicArea.type = TPM2_ALG_RSA;
     inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
-    inPublic.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_SIGN_ENCRYPT |
+    inPublic.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT |
                                             TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN;
     inPublic.publicArea.authPolicy.size = 0;
-    inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL; // Set symmetric algorithm to NULL for encryption
-    inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
+    inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL; // Set symmetric algorithm to NULL
+    inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL; // No specific scheme
     inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
-    inPublic.publicArea.parameters.rsaDetail.exponent = 0;
+    inPublic.publicArea.parameters.rsaDetail.exponent = 0; // Default exponent
     inPublic.publicArea.unique.rsa.size = 0;
 
     // Create the RSA key
@@ -259,17 +259,39 @@ TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, 
     }
 
     // Load the RSA key
-    rc = Tss2_Sys_Load(sysContext, primaryHandle, &sessionsData, &outPrivate, &outPublic, &temporaryRsaHandle, &name, &sessionsDataOut);
-    std::cout << "Loaded child key handle (hex): 0x"
-              << std::hex << rsaHandle << std::dec << std::endl;
+    //rc = Tss2_Sys_Load(sysContext, primaryHandle, &sessionsData, &outPrivate, &outPublic, &temporaryRsaHandle, &name, &sessionsDataOut);
+    //std::cout << "Loaded child key handle (hex): 0x"
+    //          << std::hex << rsaHandle << std::dec << std::endl;
+    //if (rc != TSS2_RC_SUCCESS) {
+    //    return rc;
+    //}
 
+
+
+    rc = Tss2_Sys_Load(sysContext, primaryHandle, &sessionsData, &outPrivate, &outPublic, &temporaryRsaHandle, &name, &sessionsDataOut);
     if (rc != TSS2_RC_SUCCESS) {
+        std::cerr << "Error: Failed to load key. TSS2_RC: " << rc << std::endl;
         return rc;
     }
 
-    /*rc = read_public_info(sysContext, temporaryRsaHandle, sessionsData);
+    std::cout << "Loaded child key handle (hex): 0x" << std::hex << temporaryRsaHandle << std::dec << std::endl;
+
+    // Additional debug information
+    if (temporaryRsaHandle == TPM2_RH_NULL) {
+        std::cerr << "Error: temporaryRsaHandle is not initialized properly." << std::endl;
+        return TSS2_BASE_RC_BAD_REFERENCE;
+    }
+
+
+    /*TPM2B_NAME qualifiedName = {};
+    rc = Tss2_Sys_ReadPublic(sysContext, temporaryRsaHandle, &sessionsData, &outPublic, &name, &qualifiedName, &sessionsDataOut);
+    if (rc == TPM2_RC_HANDLE) {
+        std::cerr << "Handle not found." << std::endl;
+        return rc;
+    }
     if (rc != TSS2_RC_SUCCESS) {
-        std::cout << "failed readout" << std::endl;
+        std::cerr << "Error reading public info: " << rc << std::endl;
+        return rc;
     }*/
 
     rc = Tss2_Sys_EvictControl(sysContext,
@@ -297,8 +319,11 @@ TSS2_RC encrypt_string_with_primary_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDL
 
     scheme.scheme = TPM2_ALG_NULL;
 
+
+
+    TSS2L_SYS_AUTH_COMMAND * nullCmdAuths = NULL;  // no auth for command
     // Encrypt the message
-    TSS2_RC rc = Tss2_Sys_RSA_Encrypt(sysContext, rsaHandle, &sessionsData, &message, &scheme, &label, &outData, nullptr);
+    TSS2_RC rc = Tss2_Sys_RSA_Encrypt(sysContext, rsaHandle, nullCmdAuths, &message, &scheme, &label, &outData, nullptr);
     if (rc != TSS2_RC_SUCCESS) {
         return rc;
     }
@@ -356,7 +381,7 @@ int main() {
 
 
     // REAL TPM
-    //_putenv("TSS2_TCTI_LOG_LEVEL=TSS2_LOG_LEVEL_DEBUG");
+    _putenv("TSS2_TCTI_LOG_LEVEL=TSS2_LOG_LEVEL_DEBUG");
 
     TSS2_TCTI_CONTEXT *tctiContext = nullptr;
     TSS2_RC rc;
@@ -365,7 +390,6 @@ int main() {
     TPM2B_PUBLIC outPublic = {};
     TPM2B_NAME name = {};
 
-    TSS2L_SYS_AUTH_COMMAND sessionsData = {1, {{TPM2_RS_PW, 0, 0, {0}}}};
 
 /*
     TSS2_SYS_CONTEXT  *sysContext  = nullptr;
@@ -479,6 +503,7 @@ int main() {
     }
 
 
+    // READY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
@@ -500,9 +525,7 @@ int main() {
 
 
 
-
-
-
+/*
     // Start an authorization session
     TPM2B_NONCE nonceCaller = {.size = 20, .buffer = {0}};
     TPMT_SYM_DEF symmetric = {.algorithm = TPM2_ALG_NULL};
@@ -522,17 +545,11 @@ int main() {
         Tss2_Sys_Finalize(sysContext);
         free(sysContext);
         return 1;
-    }
+    }*/
+
+    TSS2L_SYS_AUTH_COMMAND sessionsData = {1, {{TPM2_RS_PW, 0, 0, {0}}}};
 
 
-
-
-
-
-
-
-    std::cout << "LIST BEFORE PRIMARY CREATE: " << std::endl;
-    list_persistent_handles(sysContext);
 
     rc = create_primary_key(sysContext, primaryHandle, outPublic, name, sessionsData);
     if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
@@ -559,9 +576,27 @@ int main() {
         return 1;
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // after creating the primary, create a RSA key
     TPM2B_PUBLIC rsaPublic = {};
     TPM2B_PRIVATE rsaPrivate = {};
+
+
 
 
 
@@ -707,7 +742,8 @@ int main() {
 
 
 
-    rc = create_rsa_key(sysContext, primaryHandle, rsaHandle, rsaPublic, rsaPrivate, sessionsData);
+    TPM2_HANDLE temporaryRsaHandle;
+    rc = create_rsa_key(sysContext, primaryHandle, temporaryRsaHandle, rsaHandle, rsaPublic, rsaPrivate, sessionsData);
     if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
         std::cerr << "Error creating RSA key: " << rc << std::endl;
         // decode rc to info text
@@ -729,8 +765,28 @@ int main() {
               << std::hex << rsaHandle
               << std::dec << std::endl;
 
+
+    // print out rsaPublic and rsaPrivate
+    std::cout << "rsaPublic: " << std::endl;
+    std::cout << "size: " << rsaPublic.size << std::endl;
+    std::cout << "type: " << rsaPublic.publicArea.type << std::endl;
+    std::cout << "nameAlg: " << rsaPublic.publicArea.nameAlg << std::endl;
+    std::cout << "objectAttributes: " << rsaPublic.publicArea.objectAttributes << std::endl;
+    std::cout << "authPolicy.size: " << rsaPublic.publicArea.authPolicy.size << std::endl;
+    std::cout << "parameters.rsaDetail.symmetric.algorithm: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.algorithm << std::endl;
+    std::cout << "parameters.rsaDetail.symmetric.keyBits.aes: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.keyBits.aes << std::endl;
+    std::cout << "parameters.rsaDetail.symmetric.mode.aes: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.mode.aes << std::endl;
+    std::cout << "parameters.rsaDetail.scheme.scheme: " << rsaPublic.publicArea.parameters.rsaDetail.scheme.scheme << std::endl;
+    std::cout << "parameters.rsaDetail.keyBits: " << rsaPublic.publicArea.parameters.rsaDetail.keyBits << std::endl;
+    std::cout << "parameters.rsaDetail.exponent: " << rsaPublic.publicArea.parameters.rsaDetail.exponent << std::endl;
+    std::cout << "unique.rsa.size: " << rsaPublic.publicArea.unique.rsa.size << std::endl;
+
+    std::cout << "rsaPrivate: " << std::endl;
+    std::cout << "size: " << rsaPrivate.size << std::endl;
+
+
     // output RSA key information
-    /*rc = read_public_info(sysContext, rsaHandle, sessionsData);
+    rc = read_public_info(sysContext, rsaHandle, sessionsData);
     if (rc != TSS2_RC_SUCCESS) {
         std::cerr << "Error: " << rc << std::endl;
         // decode rc to info text
@@ -740,7 +796,7 @@ int main() {
         free(tctiContext);
         free(sysContext);
         return 1;
-    }*/
+    }
 
 
 
