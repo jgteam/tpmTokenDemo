@@ -217,11 +217,36 @@ TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, 
 
     // Set up public data
     inPublic.size = sizeof(TPM2B_PUBLIC);
+    //inPublic.publicArea.type = TPM2_ALG_RSA;
+    //inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
+    //inPublic.publicArea.objectAttributes = TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
+    //inPublic.publicArea.authPolicy.size = 0;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL;
+    //inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
+    //inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
+    //inPublic.publicArea.parameters.rsaDetail.exponent = 0;
+    //inPublic.publicArea.unique.rsa.size = 0;
+
+
+    //inPublic.publicArea.type = TPM2_ALG_RSA;
+    //inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
+    //inPublic.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT |
+    //                                        TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN;
+    //inPublic.publicArea.authPolicy.size = 0;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_AES;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.keyBits.aes = 128;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.mode.aes = TPM2_ALG_CFB;
+    //inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
+    //inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
+    //inPublic.publicArea.parameters.rsaDetail.exponent = 0;
+    //inPublic.publicArea.unique.rsa.size = 0;
+
     inPublic.publicArea.type = TPM2_ALG_RSA;
     inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
-    inPublic.publicArea.objectAttributes = TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
+    inPublic.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_SIGN_ENCRYPT |
+                                            TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN;
     inPublic.publicArea.authPolicy.size = 0;
-    inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL;
+    inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL; // Set symmetric algorithm to NULL for encryption
     inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
     inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
     inPublic.publicArea.parameters.rsaDetail.exponent = 0;
@@ -242,17 +267,17 @@ TSS2_RC create_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE primaryHandle, 
         return rc;
     }
 
-    rc = read_public_info(sysContext, temporaryRsaHandle, sessionsData);
+    /*rc = read_public_info(sysContext, temporaryRsaHandle, sessionsData);
     if (rc != TSS2_RC_SUCCESS) {
         std::cout << "failed readout" << std::endl;
-    }
+    }*/
 
-    /*rc = Tss2_Sys_EvictControl(sysContext,
+    rc = Tss2_Sys_EvictControl(sysContext,
                                TPM2_RH_OWNER,   // or correct hierarchy
                                temporaryRsaHandle, // ephemeral
                                &sessionsData,
                                rsaHandle,
-                               nullptr);*/
+                               nullptr);
     return rc;
 }
 
@@ -283,92 +308,44 @@ TSS2_RC encrypt_string_with_primary_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDL
     return TSS2_RC_SUCCESS;
 }
 
-void test() {
-    TSS2_RC rc;
-    TSS2_TCTI_CONTEXT *tctiContext = nullptr;
-    TSS2_SYS_CONTEXT  *sysContext  = nullptr;
+int test() {
 
-    // 1) Initialize the TCTI context for Windows TBS (two-call setup)
-    size_t tctiSize;
-    rc = Tss2_Tcti_Tbs_Init(nullptr, &tctiSize, nullptr);
-    if (rc != TSS2_RC_SUCCESS) {
-        std::cerr << "Error (1) getting TBS TCTI context size: 0x"
-                  << std::hex << rc << std::dec << std::endl;
-        return;
-    }
+        TSS2_RC rc;
+        size_t size = 0;
+        TSS2_TCTI_CONTEXT *tctiContext = nullptr;
 
-    tctiContext = (TSS2_TCTI_CONTEXT*)malloc(tctiSize);
-    if (!tctiContext) {
-        std::cerr << "Error allocating TCTI context." << std::endl;
-        return;
-    }
+        // Get the required size for the TCTI context
+        rc = Tss2_Tcti_Mssim_Init(nullptr, &size, "host=localhost,port=2321");
+        if (rc != TSS2_RC_SUCCESS) {
+            std::cerr << "Failed to get size for TCTI context: 0x"
+                      << std::hex << rc << std::dec << std::endl;
+            return 1;
+        }
 
-    rc = Tss2_Tcti_Tbs_Init(tctiContext, &tctiSize, nullptr);
-    if (rc != TSS2_RC_SUCCESS) {
-        std::cerr << "Error (2) initializing TBS TCTI context: 0x"
-                  << std::hex << rc << std::dec << std::endl;
-        free(tctiContext);
-        return;
-    }
+        // Allocate memory for the TCTI context
+        tctiContext = (TSS2_TCTI_CONTEXT *)std::malloc(size);
+        if (!tctiContext) {
+            std::cerr << "Failed to allocate memory for TCTI context" << std::endl;
+            return 1;
+        }
 
-    // 2) Initialize the SAPI (SYS) context
-    size_t sysSize = Tss2_Sys_GetContextSize(0);
-    sysContext = (TSS2_SYS_CONTEXT *)malloc(sysSize);
-    if (!sysContext) {
-        std::cerr << "Error allocating SYS context." << std::endl;
-        free(tctiContext);
-        return;
-    }
-    memset(sysContext, 0, sysSize);
+        // Initialize the TCTI context with the correct size
+        rc = Tss2_Tcti_Mssim_Init(tctiContext, &size, "host=localhost,port=2321");
+        if (rc != TSS2_RC_SUCCESS) {
+            const char *info = Tss2_RC_Decode(rc);
+            std::cout << "Error: " << info << std::endl;
+            std::cerr << "Tss2_Tcti_Mssim_Init failed: 0x"
+                      << std::hex << rc << std::dec << std::endl;
+            std::free(tctiContext);
+            return 1;
+        }
 
-    rc = Tss2_Sys_Initialize(sysContext, sysSize, tctiContext, nullptr);
-    if (rc != TSS2_RC_SUCCESS) {
-        std::cerr << "Error (3) initializing SYS context: 0x"
-                  << std::hex << rc << std::dec << std::endl;
-        free(tctiContext);
-        free(sysContext);
-        return;
-    }
+        std::cout << "TPM Simulator connection successful!" << std::endl;
 
-    // NOTE: We do NOT call Tss2_Sys_Startup on Windows TBS.
-    // The TPM is already in the started state thanks to the firmware.
+        // Free the allocated TCTI context memory
+        std::free(tctiContext);
 
-    // 3) OPTIONAL: Attempt to read a known persistent handle (e.g. 0x81010005)
-    TPM2_HANDLE handle = 0x81010005;
-    TSS2L_SYS_AUTH_COMMAND sessionsData = {
-        1, {{TPM2_RS_PW, 0, 0, {0}}}
-    };
-    TPM2B_PUBLIC outPublic    = {};
-    TPM2B_NAME   name         = {};
-    TPM2B_NAME   qualifiedName= {};
-    TSS2L_SYS_AUTH_RESPONSE sessionsDataOut;
-
-    rc = Tss2_Sys_ReadPublic(
-            sysContext,
-            handle,
-            &sessionsData,
-            &outPublic,
-            &name,
-            &qualifiedName,
-            &sessionsDataOut
-    );
-    if (rc != TSS2_RC_SUCCESS) {
-        std::cerr << "Error reading public for handle 0x"
-                  << std::hex << handle
-                  << " => 0x" << rc << std::dec << std::endl;
-        // If you see "tpm:handle(unk):the handle is not correct for the use",
-        // that means the TPM does NOT recognize this handle in TBS environment.
-    } else {
-        // Succeeded. Print outPublic details...
-        std::cout << "Successfully read public area of handle 0x"
-                  << std::hex << handle << std::dec << std::endl;
-        // e.g. show object nameAlg, keyBits, etc.
-    }
-
-    // 4) Cleanup
-    Tss2_Sys_Finalize(sysContext);
-    free(sysContext);
-    free(tctiContext);
+        return 0;
 }
 
 
@@ -382,14 +359,19 @@ int main() {
     //_putenv("TSS2_TCTI_LOG_LEVEL=TSS2_LOG_LEVEL_DEBUG");
 
     TSS2_TCTI_CONTEXT *tctiContext = nullptr;
-    TSS2_SYS_CONTEXT  *sysContext  = nullptr;
     TSS2_RC rc;
-    TPM2_HANDLE primaryHandle = 0x81010007;
-    TPM2_HANDLE rsaHandle = 0x81010207;
+    TPM2_HANDLE primaryHandle = 0x81010008;
+    TPM2_HANDLE rsaHandle = 0x81010208;
     TPM2B_PUBLIC outPublic = {};
     TPM2B_NAME name = {};
 
     TSS2L_SYS_AUTH_COMMAND sessionsData = {1, {{TPM2_RS_PW, 0, 0, {0}}}};
+
+/*
+    TSS2_SYS_CONTEXT  *sysContext  = nullptr;
+
+
+
 
     // Initialize TCTI context for real TPM
     size_t size;
@@ -425,7 +407,7 @@ int main() {
         return 1;
     }
 
-
+*/
 
 
 
@@ -439,11 +421,11 @@ int main() {
     TPM2B_NAME name = {};
 
     TSS2L_SYS_AUTH_COMMAND sessionsData = {1, {{TPM2_RS_PW, 0, 0, {0}}}};
-
+*/
     size_t size = 0;
 
     // 1) Call once with tctiContext = NULL to discover how much to allocate
-    rc = Tss2_Tcti_Mssim_Init(nullptr, &size, "host=127.0.0.1,port=2321,port2=2322");
+    rc = Tss2_Tcti_Mssim_Init(nullptr, &size, "host=127.0.0.1,port=2321");
     if (rc != TSS2_RC_SUCCESS) {
         std::cerr << "Failed to get TCTI context size: 0x"
                   << std::hex << rc << std::dec << std::endl;
@@ -458,7 +440,7 @@ int main() {
     }
 
     // 3) Initialize the TCTI context with the same config string
-    rc = Tss2_Tcti_Mssim_Init(tctiContext, &size, "host=127.0.0.1,port=2321,port2=2322");
+    rc = Tss2_Tcti_Mssim_Init(tctiContext, &size, "host=127.0.0.1,port=2321");
     if (rc != TSS2_RC_SUCCESS) {
         const char *info = Tss2_RC_Decode(rc);
         std::cout << "Error: " << info << std::endl;
@@ -484,7 +466,17 @@ int main() {
         std::free(tctiContext);
         std::free(sysContext);
         return 1;
-    }*/
+    }
+
+    // Start up the TPM
+    rc = Tss2_Sys_Startup(sysContext, TPM2_SU_CLEAR);
+    if (rc != TSS2_RC_SUCCESS && rc != TPM2_RC_INITIALIZE) {
+        std::cerr << "Error starting up TPM: 0x" << std::hex << rc << std::dec << std::endl;
+        Tss2_Sys_Finalize(sysContext);
+        std::free(tctiContext);
+        std::free(sysContext);
+        exit(1);
+    }
 
 
 
@@ -511,6 +503,26 @@ int main() {
 
 
 
+    // Start an authorization session
+    TPM2B_NONCE nonceCaller = {.size = 20, .buffer = {0}};
+    TPMT_SYM_DEF symmetric = {.algorithm = TPM2_ALG_NULL};
+    TPMI_DH_OBJECT tpmKey = TPM2_RH_NULL;
+    TPMI_DH_ENTITY bind = TPM2_RH_NULL;
+    TPM2_SE sessionType = TPM2_SE_HMAC;
+    TPM2B_ENCRYPTED_SECRET encryptedSalt = {.size = 0};
+    TPMI_ALG_HASH authHash = TPM2_ALG_SHA256;
+    TPMI_SH_AUTH_SESSION sessionHandle;
+    TPM2B_NONCE nonceTPM = {.size = 0};
+    TSS2L_SYS_AUTH_RESPONSE sessionsDataOut_authSesh = {};
+
+    rc = Tss2_Sys_StartAuthSession(sysContext, tpmKey, bind, NULL, &nonceCaller, &encryptedSalt,
+                                   sessionType, &symmetric, authHash, &sessionHandle, &nonceTPM, &sessionsDataOut_authSesh);
+    if (rc != TSS2_RC_SUCCESS) {
+        std::cerr << "Tss2_Sys_StartAuthSession failed: " << Tss2_RC_Decode(rc) << std::endl;
+        Tss2_Sys_Finalize(sysContext);
+        free(sysContext);
+        return 1;
+    }
 
 
 
@@ -519,10 +531,10 @@ int main() {
 
 
 
-
+    std::cout << "LIST BEFORE PRIMARY CREATE: " << std::endl;
     list_persistent_handles(sysContext);
 
-    /*rc = create_primary_key(sysContext, primaryHandle, outPublic, name, sessionsData);
+    rc = create_primary_key(sysContext, primaryHandle, outPublic, name, sessionsData);
     if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
         std::cerr << "Error creating primary key: " << rc << std::endl;
         // decode rc to info text
@@ -532,7 +544,11 @@ int main() {
         free(tctiContext);
         free(sysContext);
         return 1;
-    }*/
+    }
+
+    std::cout << "LIST AFTER PRIMARY CREATE: " << std::endl;
+    list_persistent_handles(sysContext);
+
 
     // check if RSA encryption scheme is available
     if (!is_scheme_available(sysContext, TPM2_ALG_RSA)) {
@@ -547,14 +563,164 @@ int main() {
     TPM2B_PUBLIC rsaPublic = {};
     TPM2B_PRIVATE rsaPrivate = {};
 
+
+
+
+
+
+
+
+/*
+    // // // TEST
+
+    // Prepare the authorization session command
+    TSS2L_SYS_AUTH_COMMAND authCommandArray = {
+        .count = 1,
+        .auths = {{
+            .sessionHandle = sessionHandle,
+            .nonce = {.size = 0},
+            .sessionAttributes = 0,
+            .hmac = {.size = 0},
+        }},
+    };
+
+    // Prepare the sensitive creation data
+    TPM2B_SENSITIVE_CREATE inSensitive = {};
+    inSensitive.size = sizeof(TPM2B_SENSITIVE_CREATE);
+    inSensitive.sensitive.userAuth.size = 0;
+    inSensitive.sensitive.data.size = 0;
+
+    // Define RSA key parameters
+    TPM2B_PUBLIC inPublic = {};
+    //inPublic.size = sizeof(TPM2B_PUBLIC);
+    //inPublic.publicArea.type = TPM2_ALG_RSA;
+    //inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
+    //inPublic.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT |
+    //                                        TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN;
+    //inPublic.publicArea.authPolicy.size = 0;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_AES;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.keyBits.aes = 128;
+    //inPublic.publicArea.parameters.rsaDetail.symmetric.mode.aes = TPM2_ALG_CFB;
+    //inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
+    //inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
+    //inPublic.publicArea.parameters.rsaDetail.exponent = 0;
+    //inPublic.publicArea.unique.rsa.size = 0;
+
+
+    inPublic.size = sizeof(TPM2B_PUBLIC);
+    inPublic.publicArea.type = TPM2_ALG_RSA;
+    inPublic.publicArea.nameAlg = TPM2_ALG_SHA256;
+    inPublic.publicArea.objectAttributes = TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
+    inPublic.publicArea.authPolicy.size = 0;
+    inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM2_ALG_NULL;
+    inPublic.publicArea.parameters.rsaDetail.scheme.scheme = TPM2_ALG_NULL;
+    inPublic.publicArea.parameters.rsaDetail.keyBits = 2048;
+    inPublic.publicArea.parameters.rsaDetail.exponent = 0;
+    inPublic.publicArea.unique.rsa.size = 0;
+
+    // Prepare other parameters for Tss2_Sys_Create
+    TPM2B_DATA outsideInfo = {};
+    outsideInfo.size = 0;
+
+    TPML_PCR_SELECTION creationPCR = {};
+
+    TPM2B_PRIVATE outPrivate = {};
+    outPrivate.size = 0;
+
+    ///////////////////////////////////////////////////////////TPM2B_PUBLIC outPublic = {};  // Corrected variable name to match the usage in Load
+    outPublic.size = 0;
+
+    TPM2B_CREATION_DATA creationData = {};
+    creationData.size = 0;
+
+    TPM2B_DIGEST creationHash = {};
+    creationHash.size = 0;
+
+    TPMT_TK_CREATION creationTicket = {};
+    creationTicket.tag = 0;
+
+    TSS2L_SYS_AUTH_RESPONSE sessionsDataOut = {};
+
+    // Create the child RSA key
+    rc = Tss2_Sys_Create(sysContext, primaryHandle, &authCommandArray, &inSensitive, &inPublic, &outsideInfo, &creationPCR,
+                         &outPrivate, &outPublic, &creationData, &creationHash, &creationTicket, &sessionsDataOut);
+    if (rc != TSS2_RC_SUCCESS) {
+        std::cerr << "Tss2_Sys_Create failed: " << Tss2_RC_Decode(rc) << std::endl;
+
+        // Attempt to flush some context to free up space
+        rc = Tss2_Sys_FlushContext(sysContext, sessionHandle);  // Flush the session handle
+        if (rc != TSS2_RC_SUCCESS) {
+            std::cerr << "Tss2_Sys_FlushContext failed: " << Tss2_RC_Decode(rc) << std::endl;
+        }
+
+        Tss2_Sys_Finalize(sysContext);
+        free(sysContext);
+        return 1;
+    }
+
+
+    TSS2L_SYS_AUTH_RESPONSE sessionsDataOut_load = {};
+
+    TPM2B_NAME name2 = {};  // Declare the name variable
+
+    // Load the child RSA key into the TPM
+    TPM2_HANDLE childHandle;
+    rc = Tss2_Sys_Load(sysContext, primaryHandle, &authCommandArray, &outPrivate, &outPublic, &childHandle, &name2, &sessionsDataOut_load);
+    if (rc != TSS2_RC_SUCCESS) {
+        std::cerr << "Tss2_Sys_Load failed: " << Tss2_RC_Decode(rc) << std::endl;
+        Tss2_Sys_FlushContext(sysContext, sessionHandle);  // Flush the session handle
+        Tss2_Sys_Finalize(sysContext);
+        free(sysContext);
+        return 1;
+    }
+
+    std::cout << "Child RSA key created and loaded successfully. Handle: " << childHandle << std::endl;
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     rc = create_rsa_key(sysContext, primaryHandle, rsaHandle, rsaPublic, rsaPrivate, sessionsData);
     if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
         std::cerr << "Error creating RSA key: " << rc << std::endl;
+        // decode rc to info text
+        const char *info = Tss2_RC_Decode(rc);
+        std::cout << "Error: " << info << std::endl;
         Tss2_Sys_Finalize(sysContext);
         free(tctiContext);
         free(sysContext);
         return 1;
     }
+
+    std::cout << "LIST AFTER RSA CREATE: " << std::endl;
+    list_persistent_handles(sysContext);
 
     std::cout << "primaryHandle = 0x"
               << std::hex << primaryHandle
@@ -564,7 +730,7 @@ int main() {
               << std::dec << std::endl;
 
     // output RSA key information
-    rc = read_public_info(sysContext, rsaHandle, sessionsData);
+    /*rc = read_public_info(sysContext, rsaHandle, sessionsData);
     if (rc != TSS2_RC_SUCCESS) {
         std::cerr << "Error: " << rc << std::endl;
         // decode rc to info text
@@ -574,7 +740,7 @@ int main() {
         free(tctiContext);
         free(sysContext);
         return 1;
-    }
+    }*/
 
 
 
