@@ -14,5 +14,8 @@ public interface NativeTPMInterface extends Library {
     int TPM_check_if_handle_is_free(long handle);
     int TPM_create_primary_key(long persistentHandle);
     int TPM_create_RSA_key(long parentHandle, long persistentHandle);
+    String TPM_encrypt(long rsaHandle, String plantext);
+    String TPM_decrypt(long rsaHandle, String ciphertext);
+    void TPM_end_session();
 
 }

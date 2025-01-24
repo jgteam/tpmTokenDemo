@@ -5,6 +5,7 @@
  */
 package tpmTokenDemo;
 
+import logger.Logger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -154,6 +155,11 @@ public class AppShell {
         readRSAPublic.setText("Read RSA Public Key");
         readRSAPublic.setEnabled(false);
 
+        Button endTPMSession = new Button(groupTPMActions, SWT.PUSH);
+        endTPMSession.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+        endTPMSession.setText("End TPM Session");
+        endTPMSession.setEnabled(false);
+
 
 
 
@@ -246,6 +252,7 @@ public class AppShell {
                     readRSAPublic.setEnabled(true);
                     encryptToken.setEnabled(true);
                     decryptToken.setEnabled(true);
+                    endTPMSession.setEnabled(true);
                     buttonRefreshPersistentHandles.setEnabled(true);
                 }
             }
@@ -263,6 +270,67 @@ public class AppShell {
                 if(!success) {
                     MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
                     messageBox.setMessage("Error setting up Keys. Check log for details.");
+                    messageBox.setText("Error");
+                    messageBox.open();
+                }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        endTPMSession.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                NativeTPMInterface.instance.TPM_end_session();
+                setupTPMUse.setEnabled(false);
+                setupKeys.setEnabled(false);
+                readRSAPublic.setEnabled(false);
+                encryptToken.setEnabled(false);
+                decryptToken.setEnabled(false);
+                endTPMSession.setEnabled(false);
+                buttonRefreshPersistentHandles.setEnabled(false);
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        encryptToken.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                boolean success = AppLogic.storeToken(textNewToken.getText());
+                if(!success) {
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
+                    messageBox.setMessage("Error storing token. Check log for details.");
+                    messageBox.setText("Error");
+                    messageBox.open();
+                } else {
+                    textNewToken.setText("");
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_INFORMATION | SWT.OK);
+                    messageBox.setMessage("Token stored successfully.");
+                    messageBox.setText("Success");
+                    messageBox.open();
+                }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        decryptToken.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                boolean success = AppLogic.retrieveToken();
+                if(!success) {
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
+                    messageBox.setMessage("Error retrieving token. Check log for details.");
                     messageBox.setText("Error");
                     messageBox.open();
                 }

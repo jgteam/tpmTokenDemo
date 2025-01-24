@@ -19,7 +19,7 @@ public class ConfigDialog {
         Display display = App.getDisplay();
         Shell shell = new Shell(display, SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL | SWT.RESIZE);
         shell.setText("Config Dialog");
-        shell.setSize(400, 350);
+        shell.setSize(400, 400);
         shell.setLayout(new GridLayout(1, false));
 
         Group group = new Group(shell, SWT.NONE);

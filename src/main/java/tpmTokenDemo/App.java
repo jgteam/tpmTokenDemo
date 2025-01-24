@@ -15,7 +15,7 @@ public class App {
     private static long PRIMARY_KEY_HANDLE = 0x8100100AL;
     private static long RSA_KEY_HANDLE = 0x8100100BL;
 
-    private static String TOKEN_STORAGE_PATH = "encryptedToken.txt";
+    private static String TOKEN_STORAGE_PATH = "encryptedToken.json";
 
     private App() {
         // Prevent instantiation

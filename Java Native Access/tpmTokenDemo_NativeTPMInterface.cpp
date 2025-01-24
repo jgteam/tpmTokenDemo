@@ -8,6 +8,7 @@
 #include <tss2/tss2_tcti_mssim.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 #include <fstream>
 #include <cstring>
 #include <cstdlib>
@@ -36,6 +37,13 @@ std::string to_uppercase(const std::string &str) {
     return result;
 }
 
+std::string encode_ciphertext(const std::vector<uint8_t>& bytes_to_encode) {
+    std::ostringstream oss;
+    for (uint8_t byte : bytes_to_encode) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
+    }
+    return oss.str();
+}
 extern "C" {
 
     TPM_API int get_rc() {
@@ -113,7 +121,11 @@ extern "C" {
         }
 
         std::string handles_str = handles;
-        return handles_str.c_str();
+
+        char* result = new char[handles_str.size() + 1];
+        std::strcpy(result, handles_str.c_str());
+
+        return result;
     }
 
     TPM_API TSS2_RC TPM_check_if_handle_is_free(const TPM2_HANDLE handle) {
@@ -208,7 +220,7 @@ extern "C" {
         return rc;
     }
 
-    TSS2_RC TPM_encrypt(const TPM2_HANDLE rsaHandle, const std::string &plainText, std::vector<uint8_t> &cipherText) {
+    TPM_API const char* TPM_encrypt(const TPM2_HANDLE rsaHandle, const char* plainText) {
         TPM2B_PUBLIC_KEY_RSA message = {};
         TPM2B_PUBLIC_KEY_RSA outData = {};
         TPMT_RSA_DECRYPT scheme = {};
@@ -217,17 +229,60 @@ extern "C" {
         TSS2L_SYS_AUTH_COMMAND * nullCmdAuths = NULL;  // no auth for command
         scheme.scheme = TPM2_ALG_NULL;
 
-        message.size = plainText.size();
-        memcpy(message.buffer, plainText.c_str(), plainText.size());
+        message.size = std::strlen(plainText);
+        memcpy(message.buffer, plainText, message.size);
 
         TSS2_RC rc = Tss2_Sys_RSA_Encrypt(sysContext, rsaHandle, nullCmdAuths, &message, &scheme, &label, &outData, nullptr);
-        if (rc != TSS2_RC_SUCCESS) { return rc; }
+        if (rc != TSS2_RC_SUCCESS) { return get_error_text(rc); }
 
-        cipherText.assign(outData.buffer, outData.buffer + outData.size);
-        return rc;
+        // Base64 encode the cipherText
+        std::vector<uint8_t> cipherText(outData.buffer, outData.buffer + outData.size);
+        std::string encoded_ciphertext = encode_ciphertext(cipherText);
+
+        char* result = new char[encoded_ciphertext.size() + 1];
+        std::strcpy(result, encoded_ciphertext.c_str());
+
+        return result;
     }
 
-    void TPM_end_session() {
+    TPM_API const char* TPM_decrypt(const TPM2_HANDLE rsaHandle, const char* cipherText) {
+        TPM2B_PUBLIC_KEY_RSA cipher = {};
+        TPM2B_PUBLIC_KEY_RSA outData = {};
+        TPMT_RSA_DECRYPT scheme = {};
+        TPM2B_DATA label = {};
+
+        scheme.scheme = TPM2_ALG_NULL;
+
+        std::vector<uint8_t> cipherTextBytes;
+        for (size_t i = 0; i < std::strlen(cipherText); i += 2) {
+            std::string byteString = std::string(cipherText + i, 2);
+            uint8_t byte = (uint8_t)strtol(byteString.c_str(), nullptr, 16);
+            cipherTextBytes.push_back(byte);
+        }
+
+        cipher.size = cipherTextBytes.size();
+        memcpy(cipher.buffer, cipherTextBytes.data(), cipher.size);
+
+        TSS2_RC rc = Tss2_Sys_RSA_Decrypt(sysContext, rsaHandle, &sessionsData, &cipher, &scheme, &label, &outData, nullptr);
+        if (rc != TSS2_RC_SUCCESS) { return get_error_text(rc); }
+
+        // Find the first non-null character in the decrypted text
+        size_t start = 0;
+        while (start < outData.size && outData.buffer[start] == '\0') {
+            ++start;
+        }
+
+        std::string decryptedText(reinterpret_cast<char*>(outData.buffer + start), outData.size - start);
+
+        char* result = new char[decryptedText.size() + 1];
+        std::strcpy(result, decryptedText.c_str());
+
+        std::cout << "Decrypted text: " << result << std::endl;
+
+        return result;
+    }
+
+    TPM_API void TPM_end_session() {
         Tss2_Sys_Finalize(sysContext);
         free(tctiContext);
         free(sysContext);
