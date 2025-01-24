@@ -72,7 +72,7 @@ public class AppLogic {
     public static String binaryCipherToDecValues(String input) {
         byte[] bytes = input.getBytes();
         // Use a StringBuilder for efficient string concatenation
-        StringBuilder hexString = new StringBuilder();
+        StringBuilder stringBuilder = new StringBuilder();
 
         for (int i = 0; i < bytes.length; i++) {
             // Convert each byte to an unsigned integer
@@ -81,25 +81,25 @@ public class AppLogic {
             // Convert to hex string and ensure two characters with leading zero if necessary
             String hex = Integer.toHexString(unsignedByte);
             if (hex.length() == 1) {
-                hexString.append('0'); // Append leading zero
+                stringBuilder.append('0'); // Append leading zero
             }
-            hexString.append(hex);
+            stringBuilder.append(hex);
 
             // Append a space after each byte except the last one
             if (i < bytes.length - 1) {
-                hexString.append(' ');
+                stringBuilder.append(' ');
             }
         }
 
-        return hexString.toString().toUpperCase();
+        return stringBuilder.toString().toUpperCase();
     }
 
     public static String decValuesToBinaryCipher(String hexInput) {
-        String[] hexArray = hexInput.split(" ");
-        byte[] bytes = new byte[hexArray.length];
+        String[] string = hexInput.split(" ");
+        byte[] bytes = new byte[string.length];
 
-        for (int i = 0; i < hexArray.length; i++) {
-            bytes[i] = (byte) Integer.parseInt(hexArray[i], 16);
+        for (int i = 0; i < string.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(string[i], 16);
         }
 
         return new String(bytes);
@@ -107,21 +107,34 @@ public class AppLogic {
 
 
     public static boolean storeToken(String plaintext) {
-        String ciphertext = "";
-        try {
-            ciphertext = NativeTPMInterface.instance.TPM_encrypt(App.getRsaKeyHandle(), plaintext);
-        } catch (Exception ex) {
-            Logger.log("AppShell", "Error encrypting token: " + ex.getMessage());
-            return false;
+
+        int maxLen = 256; // mac length of Tss2_MU_TPM2B_PUBLIC_KEY_RSA_Marshal is 512
+        int len = plaintext.length();
+        int parts = len / maxLen;
+        if(len % maxLen != 0) {
+            parts++;
         }
 
-        if(ciphertext.isEmpty()) {
-            Logger.log("AppShell", "Error encrypting token: Empty ciphertext returned.");
-            return false;
+        String[] tokenParts = new String[parts];
+        for(int i = 0; i < parts; i++) {
+            int start = i * maxLen;
+            int end = Math.min((i + 1) * maxLen, len);
+            tokenParts[i] = plaintext.substring(start, end);
         }
 
-        String ciphertextUTF8 = binaryCipherToDecValues(ciphertext);
-        Logger.log("AppShell", "Encrypted token: " + ciphertextUTF8);
+        String[] ciphertextParts = new String[parts];
+        String[] ciphertextPartsReadable = new String[parts];
+        for(int i = 0; i < parts; i++) {
+            try {
+                ciphertextParts[i] = NativeTPMInterface.instance.TPM_encrypt(App.getRsaKeyHandle(), tokenParts[i]);
+                ciphertextPartsReadable[i] = binaryCipherToDecValues(ciphertextParts[i]);
+            } catch (Exception ex) {
+                Logger.log("AppShell", "Error encrypting token: " + ex.getMessage());
+                return false;
+            }
+        }
+
+        Logger.log("AppShell", "Encrypted token: " + String.join(" ", ciphertextPartsReadable));
 
         // make a json object with the encrypted token using com.fasterxml.jackson.core
         // and write it to the file
@@ -131,7 +144,10 @@ public class AppLogic {
             tokenJson.put("schemaVersion", 1);
             tokenJson.put("rsaHandle", App.getRsaKeyHandle());
             tokenJson.put("info", "Encrypted with tpmTokenDemo-Application (github.com/jgteam/tpmTokenDemo)");
-            tokenJson.put("encryptedToken", ciphertextUTF8);
+            tokenJson.putArray("encryptedTokenParts");
+            for(int i = 0; i < parts; i++) {
+                tokenJson.withArray("encryptedTokenParts").add(ciphertextPartsReadable[i]);
+            }
 
             // Write JSON to file
             mapper.writeValue(new File(App.getTokenStoragePath()), tokenJson);
@@ -173,7 +189,54 @@ public class AppLogic {
             return false;
         }
 
-        String ciphertext = tokenJson.get("encryptedToken").asText();
+
+
+
+
+
+
+
+
+        String[] ciphertextParts = new String[tokenJson.withArray("encryptedTokenParts").size()];
+        for (int i = 0; i < ciphertextParts.length; i++) {
+            ciphertextParts[i] = tokenJson.withArray("encryptedTokenParts").get(i).asText();
+        }
+
+        StringBuilder plaintextBuilder = new StringBuilder();
+        try {
+            for (String part : ciphertextParts) {
+                plaintextBuilder.append(NativeTPMInterface.instance.TPM_decrypt(App.getRsaKeyHandle(), decValuesToBinaryCipher(part)));
+            }
+        } catch (Exception ex) {
+            Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
+            return false;
+        }
+
+        String plaintext = plaintextBuilder.toString();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        /*String ciphertext = tokenJson.get("encryptedToken").asText();
         String plaintext = "";
 
         try {
@@ -181,7 +244,7 @@ public class AppLogic {
         } catch (Exception ex) {
             Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
             return false;
-        }
+        }*/
 
         Logger.log("AppShell", "Decrypted token: " + plaintext);
         TokenViewerDialog dialog = new TokenViewerDialog("Decrypted Token", plaintext.toCharArray());
