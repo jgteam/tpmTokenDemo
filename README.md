@@ -7,3 +7,5 @@ Deps:
 [libwinpthread-1.dll](library/libwinpthread-1.dll)
 [libssp-0.dll](library/libssp-0.dll)
 .. can be found in MinGW
+
+This Repo countains already build DLLs and dependencies... it is always better to build them yourself on your machine for your device!

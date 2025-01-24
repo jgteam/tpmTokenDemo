@@ -1,4 +1,0 @@
-LIBRARY tss2-tcti-i2c-ftdi
-EXPORTS
-    Tss2_Tcti_Info
-    Tss2_Tcti_I2c_Ftdi_Init
