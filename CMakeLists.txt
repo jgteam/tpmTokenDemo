@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.30)
 project(untitled)
 
+find_package(JNI REQUIRED)
+include_directories(${JNI_INCLUDE_DIRS})
+
 set(CMAKE_CXX_STANDARD 20)
 
 # Set the path to the TPM2-TSS library and include directory
