@@ -333,6 +333,29 @@ TSS2_RC encrypt_string_with_primary_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDL
     return TSS2_RC_SUCCESS;
 }
 
+TSS2_RC decrypt_string_with_rsa_key(TSS2_SYS_CONTEXT *sysContext, TPM2_HANDLE rsaHandle, const std::vector<uint8_t> &cipherText, std::string &plainText, TSS2L_SYS_AUTH_COMMAND &sessionsData) {
+    TPM2B_PUBLIC_KEY_RSA cipherMessage = {};
+    TPM2B_PUBLIC_KEY_RSA outData = {};
+    TPMT_RSA_DECRYPT scheme = {};
+    TPM2B_DATA label = {};
+
+    // Set up the cipher message to be decrypted
+    cipherMessage.size = cipherText.size();
+    memcpy(cipherMessage.buffer, cipherText.data(), cipherText.size());
+
+    scheme.scheme = TPM2_ALG_NULL;
+
+    // Decrypt the message
+    TSS2_RC rc = Tss2_Sys_RSA_Decrypt(sysContext, rsaHandle, &sessionsData, &cipherMessage, &scheme, &label, &outData, nullptr);
+    if (rc != TSS2_RC_SUCCESS) {
+        return rc;
+    }
+
+    // Copy the decrypted data to the output string
+    plainText.assign(reinterpret_cast<char*>(outData.buffer), outData.size);
+    return TSS2_RC_SUCCESS;
+}
+
 int test() {
 
         TSS2_RC rc;
@@ -373,6 +396,41 @@ int test() {
         return 0;
 }
 
+// Method to trim leading whitespace from a string
+void trim_leading_whitespace(std::string &str) {
+    size_t start = 0;
+    while (start < str.size() && std::isspace(static_cast<unsigned char>(str[start]))) {
+        ++start;
+    }
+    str = str.substr(start);
+}
+
+// Method to write std::vector<uint8_t> to a file
+void write_vector_to_file(const std::vector<uint8_t> &data, const std::string &filename) {
+    std::ofstream outFile(filename, std::ios::binary);
+    if (!outFile) {
+        std::cerr << "Error opening file for writing: " << filename << std::endl;
+        return;
+    }
+    std::string utf8String(data.begin(), data.end());
+    outFile.write(utf8String.c_str(), utf8String.size());
+    if (!outFile) {
+        std::cerr << "Error writing to file: " << filename << std::endl;
+    }
+    outFile.close();
+}
+
+// Method to read std::vector<uint8_t> from a file
+void read_vector_from_file(std::vector<uint8_t> &data, const std::string &filename) {
+    std::ifstream inFile(filename, std::ios::binary);
+    if (!inFile) {
+        std::cerr << "Error opening file for reading: " << filename << std::endl;
+        return;
+    }
+    std::string utf8String((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+    data.assign(utf8String.begin(), utf8String.end());
+    inFile.close();
+}
 
 int main() {
     //test();
@@ -434,7 +492,8 @@ int main() {
 */
 
 
-
+    // boolean to create keys
+    bool createKeys = false;
 
 
 
@@ -550,17 +609,18 @@ int main() {
     TSS2L_SYS_AUTH_COMMAND sessionsData = {1, {{TPM2_RS_PW, 0, 0, {0}}}};
 
 
-
-    rc = create_primary_key(sysContext, primaryHandle, outPublic, name, sessionsData);
-    if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
-        std::cerr << "Error creating primary key: " << rc << std::endl;
-        // decode rc to info text
-        const char *info = Tss2_RC_Decode(rc);
-        std::cout << "Error: " << info << std::endl;
-        Tss2_Sys_Finalize(sysContext);
-        free(tctiContext);
-        free(sysContext);
-        return 1;
+    if(createKeys) {
+        rc = create_primary_key(sysContext, primaryHandle, outPublic, name, sessionsData);
+        if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
+            std::cerr << "Error creating primary key: " << rc << std::endl;
+            // decode rc to info text
+            const char *info = Tss2_RC_Decode(rc);
+            std::cout << "Error: " << info << std::endl;
+            Tss2_Sys_Finalize(sysContext);
+            free(tctiContext);
+            free(sysContext);
+            return 1;
+        }
     }
 
     std::cout << "LIST AFTER PRIMARY CREATE: " << std::endl;
@@ -743,16 +803,19 @@ int main() {
 
 
     TPM2_HANDLE temporaryRsaHandle;
-    rc = create_rsa_key(sysContext, primaryHandle, temporaryRsaHandle, rsaHandle, rsaPublic, rsaPrivate, sessionsData);
-    if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
-        std::cerr << "Error creating RSA key: " << rc << std::endl;
-        // decode rc to info text
-        const char *info = Tss2_RC_Decode(rc);
-        std::cout << "Error: " << info << std::endl;
-        Tss2_Sys_Finalize(sysContext);
-        free(tctiContext);
-        free(sysContext);
-        return 1;
+
+    if(createKeys) {
+        rc = create_rsa_key(sysContext, primaryHandle, temporaryRsaHandle, rsaHandle, rsaPublic, rsaPrivate, sessionsData);
+        if (!(rc == TSS2_RC_SUCCESS || rc == 332)) { // 332 is the error code for persistent obj already exists
+            std::cerr << "Error creating RSA key: " << rc << std::endl;
+            // decode rc to info text
+            const char *info = Tss2_RC_Decode(rc);
+            std::cout << "Error: " << info << std::endl;
+            Tss2_Sys_Finalize(sysContext);
+            free(tctiContext);
+            free(sysContext);
+            return 1;
+        }
     }
 
     std::cout << "LIST AFTER RSA CREATE: " << std::endl;
@@ -799,13 +862,43 @@ int main() {
     }
 
 
-
-    // Encrypt a string using the created primary key
-    std::string plainText = "Ola";
     std::vector<uint8_t> cipherText;
-    rc = encrypt_string_with_primary_key(sysContext, rsaHandle, plainText, cipherText, sessionsData);
+
+    bool encrypt = false;
+    if(encrypt) {
+        // Encrypt a string using the created primary key
+        std::string plainText = "Ja das ist es... Habe mein eines Flow-Diagram der ganzen Klassen und Methodenaufrufe mal erweitert und die bestehende Umsetzung verleihtet manchmal in falsche Richtungen... ";
+
+        rc = encrypt_string_with_primary_key(sysContext, rsaHandle, plainText, cipherText, sessionsData);
+        if (rc != TSS2_RC_SUCCESS) {
+            std::cerr << "Error encrypting string: " << rc << std::endl;
+            // decode rc to info text
+            const char *info = Tss2_RC_Decode(rc);
+            std::cout << "Error: " << info << std::endl;
+            Tss2_Sys_Finalize(sysContext);
+            free(tctiContext);
+            free(sysContext);
+            return 1;
+        }
+        write_vector_to_file(cipherText, "cipherText.dat");
+    }
+
+
+
+    read_vector_from_file(cipherText, "cipherText.dat");
+
+    // Output the encrypted data
+    std::cout << "Encrypted Data: ";
+    for (uint8_t byte : cipherText) {
+        std::cout << std::hex << (int)byte << " ";
+    }
+    std::cout << std::endl;
+
+    // Decrypt the string using the created primary key
+    std::string decryptedText;
+    rc = decrypt_string_with_rsa_key(sysContext, rsaHandle, cipherText, decryptedText, sessionsData);
     if (rc != TSS2_RC_SUCCESS) {
-        std::cerr << "Error encrypting string: " << rc << std::endl;
+        std::cerr << "Error decrypting string: " << rc << std::endl;
         // decode rc to info text
         const char *info = Tss2_RC_Decode(rc);
         std::cout << "Error: " << info << std::endl;
@@ -815,12 +908,63 @@ int main() {
         return 1;
     }
 
-    // Output the encrypted data
-    std::cout << "Encrypted Data: ";
-    for (uint8_t byte : cipherText) {
-        std::cout << std::hex << (int)byte << " ";
+    trim_leading_whitespace(decryptedText);
+
+    std::cout << "Decrypted Data: ";
+    for (char byte : decryptedText) {
+        std::cout << byte;
     }
-    std::cout << std::endl;
+
+    // End session tpm
+    Tss2_Sys_Finalize(sysContext);
+    free(tctiContext);
+    free(sysContext);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -851,7 +995,7 @@ int main() {
         std::cout << "Primary key information retrieved from TPM." << std::endl;
     }
     */
-
+/*
     // Output primary key information
     std::cout << "Primary Handle: " << primaryHandle << std::endl;
     std::cout << "Name: ";
@@ -870,6 +1014,6 @@ int main() {
     // Clean up
     Tss2_Sys_Finalize(sysContext);
     free(tctiContext);
-    free(sysContext);
+    free(sysContext);*/
     return 0;
 }
