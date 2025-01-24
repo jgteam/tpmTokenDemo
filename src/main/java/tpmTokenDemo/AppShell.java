@@ -19,7 +19,12 @@ public class AppShell {
     private static Shell shell = null;
 
     // UI elements
-    public static Combo combo;
+    public static Button buttonRefreshPersistentHandles;
+    public static Label infoTPMPersitentHandlesLabel;
+
+    public static Label infoTPMPrimaryHandleLabel;
+    public static Label infoTPMRSAHandleLabel;
+    public static Label infoTokenLocationLabel;
 
     private AppShell() {
         // Prevent instantiation
@@ -80,26 +85,16 @@ public class AppShell {
         infoTPMPersitentHandlesLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
         infoTPMPersitentHandlesLabelHeading.setText("Found Handles:");
 
-        Label infoTPMPersitentHandlesLabel = new Label(groupSetup, SWT.WRAP);
+        infoTPMPersitentHandlesLabel = new Label(groupSetup, SWT.WRAP);
         infoTPMPersitentHandlesLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        infoTPMPersitentHandlesLabel.setText("0x00000000\n0x00000000\n0x00000000\n0x00000000");
+        infoTPMPersitentHandlesLabel.setText("n/a");
 
         // TPM READOUT BUTTON
-        Button buttonRefreshPersistentHandles = new Button(groupSetup, SWT.PUSH);
+        buttonRefreshPersistentHandles = new Button(groupSetup, SWT.PUSH);
         buttonRefreshPersistentHandles.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
         buttonRefreshPersistentHandles.setText("Refresh List of Handles");
+        buttonRefreshPersistentHandles.setEnabled(false);
 
-        buttonRefreshPersistentHandles.addSelectionListener(new SelectionListener() {
-            @Override
-            public void widgetSelected(SelectionEvent e) {
-
-            }
-
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e) {
-                // Do nothing
-            }
-        });
 
 
         // APP SETUP GROUP
@@ -112,7 +107,7 @@ public class AppShell {
         infoTPMPrimaryHandleLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
         infoTPMPrimaryHandleLabelHeading.setText("Primary-Key Handle:");
 
-        Label infoTPMPrimaryHandleLabel = new Label(groupAppSetup, SWT.WRAP);
+        infoTPMPrimaryHandleLabel = new Label(groupAppSetup, SWT.WRAP);
         infoTPMPrimaryHandleLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
         infoTPMPrimaryHandleLabel.setText("0x" + Long.toHexString(App.getPrimaryKeyHandle()).toUpperCase());
 
@@ -120,26 +115,22 @@ public class AppShell {
         infoTPMRSAHandleLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
         infoTPMRSAHandleLabelHeading.setText("RSA-Key Handle:");
 
-        Label infoTPMRSAHandleLabel = new Label(groupAppSetup, SWT.WRAP);
+        infoTPMRSAHandleLabel = new Label(groupAppSetup, SWT.WRAP);
         infoTPMRSAHandleLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
         infoTPMRSAHandleLabel.setText("0x" + Long.toHexString(App.getRsaKeyHandle()).toUpperCase());
-
-        Label infoTPMHandlesInfoLabel = new Label(groupAppSetup, SWT.WRAP);
-        infoTPMHandlesInfoLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
-        infoTPMHandlesInfoLabel.setText("Note: The handles can be changed in the source code of this app.\n");
 
         Label infoTokenLocationLabelHeading = new Label(groupAppSetup, SWT.NONE);
         infoTokenLocationLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false, 2, 1));
         infoTokenLocationLabelHeading.setText("Token Storage Location:");
 
-        Label infoTokenLocationLabel = new Label(groupAppSetup, SWT.WRAP);
+        infoTokenLocationLabel = new Label(groupAppSetup, SWT.WRAP);
         infoTokenLocationLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
         infoTokenLocationLabel.setText(App.getTokenStoragePath());
 
-        Label infoTokenLocationInfoLabel = new Label(groupAppSetup, SWT.WRAP);
-        infoTokenLocationInfoLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
-        infoTokenLocationInfoLabel.setText("Note: The token storage location can be changed with the 1st argument of the app.");
-
+        // CONFIG BUTTON
+        Button buttonOpenConfigDialog = new Button(groupAppSetup, SWT.PUSH);
+        buttonOpenConfigDialog.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
+        buttonOpenConfigDialog.setText("Edit Config");
 
 
 
@@ -152,6 +143,11 @@ public class AppShell {
         Button setupTPMUse = new Button(groupTPMActions, SWT.PUSH);
         setupTPMUse.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
         setupTPMUse.setText("Setup TPM for use");
+
+        Button setupKeys = new Button(groupTPMActions, SWT.PUSH);
+        setupKeys.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+        setupKeys.setText("Setup Keys");
+        setupKeys.setEnabled(false);
 
         Button readRSAPublic = new Button(groupTPMActions, SWT.PUSH);
         readRSAPublic.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
@@ -194,11 +190,11 @@ public class AppShell {
 
 
 
-
         // LOG BUTTON
         Button buttonOpenLog = new Button(shell, SWT.PUSH);
         buttonOpenLog.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
         buttonOpenLog.setText("Open Log Viewer");
+
 
         // INFO LABEL
         Label infoLabel = new Label(shell, SWT.WRAP);
@@ -206,10 +202,97 @@ public class AppShell {
         infoLabel.setText("\n\nTPM Demo Application - This application is part of a Bachelor's thesis project by Jannis Günsche. \n\nDisclaimer: This application demonstrates the use of the TPM. Only use this application for demonstration purposes.");
 
 
+        // LISTENERS
 
+        buttonRefreshPersistentHandles.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                infoTPMPersitentHandlesLabel.setText(NativeTPMInterface.instance.TPM_get_persistent_handles(App.getPrimaryKeyHandle(), App.getRsaKeyHandle()));
+                infoTPMPersitentHandlesLabel.getParent().layout();
+                groupAppSetup.getParent().layout();
+                AppShell.buttonRefreshPersistentHandles.setForeground(App.getDisplay().getSystemColor(SWT.COLOR_BLACK));
+            }
 
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        buttonOpenConfigDialog.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                ConfigDialog.open();
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        setupTPMUse.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                boolean success = AppLogic.setupTPM();
+                if(!success) {
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
+                    messageBox.setMessage("Error setting up TPM. Check log for details.");
+                    messageBox.setText("Error");
+                    messageBox.open();
+                } else {
+                    setupTPMUse.setEnabled(false);
+                    setupKeys.setEnabled(true);
+                    readRSAPublic.setEnabled(true);
+                    encryptToken.setEnabled(true);
+                    decryptToken.setEnabled(true);
+                    buttonRefreshPersistentHandles.setEnabled(true);
+                }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        setupKeys.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                boolean success = AppLogic.createKeys();
+                if(!success) {
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
+                    messageBox.setMessage("Error setting up Keys. Check log for details.");
+                    messageBox.setText("Error");
+                    messageBox.open();
+                }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        buttonOpenLog.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                LogDialog.open();
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
 
         return shell;
+    }
+
+    public static void updateConfigLabels() {
+        infoTPMPrimaryHandleLabel.setText("0x" + Long.toHexString(App.getPrimaryKeyHandle()).toUpperCase());
+        infoTPMRSAHandleLabel.setText("0x" + Long.toHexString(App.getRsaKeyHandle()).toUpperCase());
+        infoTokenLocationLabel.setText(App.getTokenStoragePath());
     }
 
 }
