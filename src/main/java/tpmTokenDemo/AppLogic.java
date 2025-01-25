@@ -16,10 +16,18 @@ public class AppLogic {
         // Prevent instantiation
     }
 
-    public static boolean setupTPM() {
+    public static boolean setupTPM(int selectedTPM) {
+        boolean useSimulator = selectedTPM == 0;
+
         int rc = 0;
 
-        rc = NativeTPMInterface.instance.TPM_setup_simulator();
+        if(useSimulator) {
+            Logger.log("AppLogic", "Using TPM Simulator...");
+            rc = NativeTPMInterface.instance.TPM_setup_simulator();
+        } else {
+            Logger.log("AppLogic", "Using TPM Device...");
+            rc = NativeTPMInterface.instance.TPM_setup_real();
+        }
         if( rc != 0 ) {
             Logger.log("AppLogic", "Error setting up TPM Simulator: " + NativeTPMInterface.instance.get_error_text(rc));
             return false;
@@ -69,42 +77,20 @@ public class AppLogic {
         return true;
     }
 
-    public static String binaryCipherToDecValues(String input) {
-        byte[] bytes = input.getBytes();
-        // Use a StringBuilder for efficient string concatenation
+    public static String cleanUpCipher(String input) {
         StringBuilder stringBuilder = new StringBuilder();
-
-        for (int i = 0; i < bytes.length; i++) {
-            // Convert each byte to an unsigned integer
-            int unsignedByte = bytes[i] & 0xFF;
-
-            // Convert to hex string and ensure two characters with leading zero if necessary
-            String hex = Integer.toHexString(unsignedByte);
-            if (hex.length() == 1) {
-                stringBuilder.append('0'); // Append leading zero
-            }
-            stringBuilder.append(hex);
-
-            // Append a space after each byte except the last one
-            if (i < bytes.length - 1) {
+        for (int i = 0; i < input.length(); i++) {
+            if (i % 2 == 0 && i > 0) {
                 stringBuilder.append(' ');
             }
+            stringBuilder.append(input.charAt(i));
         }
-
         return stringBuilder.toString().toUpperCase();
     }
 
-    public static String decValuesToBinaryCipher(String hexInput) {
-        String[] string = hexInput.split(" ");
-        byte[] bytes = new byte[string.length];
-
-        for (int i = 0; i < string.length; i++) {
-            bytes[i] = (byte) Integer.parseInt(string[i], 16);
-        }
-
-        return new String(bytes);
+    public static String putBackCipher(String input) {
+        return input.replace(" ", "");
     }
-
 
     public static boolean storeToken(String plaintext) {
 
@@ -127,7 +113,7 @@ public class AppLogic {
         for(int i = 0; i < parts; i++) {
             try {
                 ciphertextParts[i] = NativeTPMInterface.instance.TPM_encrypt(App.getRsaKeyHandle(), tokenParts[i]);
-                ciphertextPartsReadable[i] = binaryCipherToDecValues(ciphertextParts[i]);
+                ciphertextPartsReadable[i] = cleanUpCipher(ciphertextParts[i]);
             } catch (Exception ex) {
                 Logger.log("AppShell", "Error encrypting token: " + ex.getMessage());
                 return false;
@@ -189,14 +175,6 @@ public class AppLogic {
             return false;
         }
 
-
-
-
-
-
-
-
-
         String[] ciphertextParts = new String[tokenJson.withArray("encryptedTokenParts").size()];
         for (int i = 0; i < ciphertextParts.length; i++) {
             ciphertextParts[i] = tokenJson.withArray("encryptedTokenParts").get(i).asText();
@@ -205,7 +183,7 @@ public class AppLogic {
         StringBuilder plaintextBuilder = new StringBuilder();
         try {
             for (String part : ciphertextParts) {
-                plaintextBuilder.append(NativeTPMInterface.instance.TPM_decrypt(App.getRsaKeyHandle(), decValuesToBinaryCipher(part)));
+                plaintextBuilder.append(NativeTPMInterface.instance.TPM_decrypt(App.getRsaKeyHandle(), putBackCipher(part)));
             }
         } catch (Exception ex) {
             Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
@@ -213,38 +191,6 @@ public class AppLogic {
         }
 
         String plaintext = plaintextBuilder.toString();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        /*String ciphertext = tokenJson.get("encryptedToken").asText();
-        String plaintext = "";
-
-        try {
-            plaintext = NativeTPMInterface.instance.TPM_decrypt(App.getRsaKeyHandle(), decValuesToBinaryCipher(ciphertext));
-        } catch (Exception ex) {
-            Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
-            return false;
-        }*/
 
         Logger.log("AppShell", "Decrypted token: " + plaintext);
         TokenViewerDialog dialog = new TokenViewerDialog("Decrypted Token", plaintext.toCharArray());
@@ -290,5 +236,14 @@ public class AppLogic {
             Logger.log("AppLogic", "Error decoding token: " + e.getMessage());
             return "[ Error decoding token ]";
         }
+    }
+
+    public static String hexStringToAscii(String hexString) {
+        StringBuilder output = new StringBuilder();
+        for (int i = 0; i < hexString.length(); i += 2) {
+            String str = hexString.substring(i, i + 2);
+            output.append((char) Integer.parseInt(str, 16));
+        }
+        return output.toString();
     }
 }

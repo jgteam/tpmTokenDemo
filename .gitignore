@@ -1,2 +1,3 @@
 *.bak
 /exampleToken.txt
+/deviceTPMHandles.txt

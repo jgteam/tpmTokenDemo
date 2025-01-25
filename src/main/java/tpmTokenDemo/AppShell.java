@@ -64,15 +64,7 @@ public class AppShell {
 
         Label infoTPMManuLabel = new Label(groupSetup, SWT.WRAP);
         infoTPMManuLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        infoTPMManuLabel.setText("XXXX");
-
-        Label infoTPMManuVersionLabelHeading = new Label(groupSetup, SWT.NONE);
-        infoTPMManuVersionLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
-        infoTPMManuVersionLabelHeading.setText("TPM Manu. Version:");
-
-        Label infoTPMManuVersionLabel = new Label(groupSetup, SWT.WRAP);
-        infoTPMManuVersionLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        infoTPMManuVersionLabel.setText("XXXX");
+        infoTPMManuLabel.setText("n/a");
 
         Label infoTPMVersionLabelHeading = new Label(groupSetup, SWT.NONE);
         infoTPMVersionLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
@@ -80,7 +72,7 @@ public class AppShell {
 
         Label infoTPMVersionLabel = new Label(groupSetup, SWT.WRAP);
         infoTPMVersionLabel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        infoTPMVersionLabel.setText("XXXX");
+        infoTPMVersionLabel.setText("n/a");
 
         Label infoTPMPersitentHandlesLabelHeading = new Label(groupSetup, SWT.NONE);
         infoTPMPersitentHandlesLabelHeading.setLayoutData(new GridData(SWT.BEGINNING, SWT.TOP, false, false));
@@ -93,7 +85,7 @@ public class AppShell {
         // TPM READOUT BUTTON
         buttonRefreshPersistentHandles = new Button(groupSetup, SWT.PUSH);
         buttonRefreshPersistentHandles.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
-        buttonRefreshPersistentHandles.setText("Refresh List of Handles");
+        buttonRefreshPersistentHandles.setText("Refresh Info");
         buttonRefreshPersistentHandles.setEnabled(false);
 
 
@@ -140,6 +132,15 @@ public class AppShell {
         groupTPMActions.setLayout(new GridLayout(2, true));
         groupTPMActions.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
         groupTPMActions.setText("TPM Actions");
+
+        Label labelTPMSelector = new Label(groupTPMActions, SWT.NONE);
+        labelTPMSelector.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
+        labelTPMSelector.setText("Select TPM:");
+
+        Combo comboTPMSelector = new Combo(groupTPMActions, SWT.READ_ONLY);
+        comboTPMSelector.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
+        comboTPMSelector.setItems(new String[] {"Simulator TPM (host=127.0.0.1; port(tpm)=2321; port(platform)=2322)", "Device TPM (not recommended)"});
+        comboTPMSelector.select(0);
 
         Button setupTPMUse = new Button(groupTPMActions, SWT.PUSH);
         setupTPMUse.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
@@ -213,6 +214,8 @@ public class AppShell {
         buttonRefreshPersistentHandles.addSelectionListener(new SelectionListener() {
             @Override
             public void widgetSelected(SelectionEvent e) {
+                infoTPMManuLabel.setText(NativeTPMInterface.instance.TPM_get_manufacturer());
+                infoTPMVersionLabel.setText(AppLogic.hexStringToAscii(NativeTPMInterface.instance.TPM_get_version()));
                 infoTPMPersitentHandlesLabel.setText(NativeTPMInterface.instance.TPM_get_persistent_handles(App.getPrimaryKeyHandle(), App.getRsaKeyHandle()));
                 infoTPMPersitentHandlesLabel.getParent().layout();
                 groupAppSetup.getParent().layout();
@@ -240,13 +243,14 @@ public class AppShell {
         setupTPMUse.addSelectionListener(new SelectionListener() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                boolean success = AppLogic.setupTPM();
+                boolean success = AppLogic.setupTPM(comboTPMSelector.getSelectionIndex());
                 if(!success) {
                     MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
                     messageBox.setMessage("Error setting up TPM. Check log for details.");
                     messageBox.setText("Error");
                     messageBox.open();
                 } else {
+                    comboTPMSelector.setEnabled(false);
                     setupTPMUse.setEnabled(false);
                     setupKeys.setEnabled(true);
                     readRSAPublic.setEnabled(true);

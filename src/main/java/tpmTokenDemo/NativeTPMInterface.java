@@ -9,7 +9,10 @@ public interface NativeTPMInterface extends Library {
 
     int get_rc();
     String get_error_text(int rc);
+    String TPM_get_version();
+    String TPM_get_manufacturer();
     int TPM_setup_simulator();
+    int TPM_setup_real();
     String TPM_get_persistent_handles(long primaryHandle, long rsaHandle);
     int TPM_check_if_handle_is_free(long handle);
     int TPM_create_primary_key(long persistentHandle);

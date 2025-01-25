@@ -54,14 +54,48 @@ extern "C" {
         return Tss2_RC_Decode(rc);
     }
 
-    // ToDo: remove
-    TSS2_RC DEBUG(const TSS2_RC rc) {
-        if (rc != TSS2_RC_SUCCESS) {
-            std::string errorText = get_error_text(rc);
-            std::cerr << "Error: " << errorText << std::endl;
+    TPM_API const char* TPM_get_version() {
+        TPMS_CAPABILITY_DATA capabilityData;
+        TPMI_YES_NO moreData;
+
+        rc = Tss2_Sys_GetCapability(sysContext, nullptr, TPM2_CAP_TPM_PROPERTIES, TPM2_SPEC_LEVEL, 1, &moreData, &capabilityData, nullptr);
+        if (rc != TSS2_RC_SUCCESS) { return get_error_text(rc); }
+
+        std::stringstream versionStream;
+        versionStream << std::hex << capabilityData.data.tpmProperties.tpmProperty[0].value;
+
+        std::string versionStr = versionStream.str();
+        char* result = new char[versionStr.size() + 1];
+        std::strcpy(result, versionStr.c_str());
+
+        return result;
+    }
+
+    TPM_API const char* TPM_get_manufacturer() {
+        TPMS_CAPABILITY_DATA capabilityData;
+        TPMI_YES_NO moreData;
+
+        rc = Tss2_Sys_GetCapability(sysContext, nullptr, TPM2_CAP_TPM_PROPERTIES, TPM2_PT_MANUFACTURER, 1, &moreData, &capabilityData, nullptr);
+        if (rc != TSS2_RC_SUCCESS) { return get_error_text(rc); }
+
+        std::string manufacturer;
+        bool leadingZeros = true;
+        for (size_t i = sizeof(capabilityData.data.vendor.buffer); i > 0; --i) {
+            if (leadingZeros && capabilityData.data.vendor.buffer[i] == '\0') {
+                continue;
+            }
+            if (capabilityData.data.vendor.buffer[i] == '\0') {
+                break;
+            }
+
+            leadingZeros = false;
+            manufacturer += capabilityData.data.vendor.buffer[i];
         }
 
-        return rc;
+        char* result = new char[manufacturer.size() + 1];
+        std::strcpy(result, manufacturer.c_str());
+
+        return result;
     }
 
     TPM_API TSS2_RC TPM_setup_simulator() {
@@ -85,6 +119,31 @@ extern "C" {
 
         rc = Tss2_Sys_Startup(sysContext, TPM2_SU_CLEAR); // Usually not needed when using a real TPM.
         if (rc != TSS2_RC_SUCCESS && rc != TPM2_RC_INITIALIZE) { return rc; }
+
+        if (rc == TPM2_RC_INITIALIZE) { return TSS2_RC_SUCCESS; } // TPM already initialized.
+        return rc;
+
+    }
+
+    TPM_API TSS2_RC TPM_setup_real() {
+
+        size_t size = 0;
+        rc = Tss2_Tcti_Tbs_Init(NULL, &size, NULL);
+        if (rc != TSS2_RC_SUCCESS) { return rc; }
+
+        tctiContext = (TSS2_TCTI_CONTEXT*)malloc(size);
+        rc = Tss2_Tcti_Tbs_Init(tctiContext, &size, NULL);
+        if (rc != TSS2_RC_SUCCESS) { return rc; }
+
+        rc = Tss2_Tcti_Tbs_Init(tctiContext, &size, nullptr);
+        if (rc != TSS2_RC_SUCCESS) { return rc; }
+
+        size_t sysCtxSize = Tss2_Sys_GetContextSize(0);
+        sysContext = static_cast<TSS2_SYS_CONTEXT*>(std::calloc(1, sysCtxSize));
+        if (!sysContext) { return TSS2_SYS_RC_GENERAL_FAILURE; } // Error allocating sysContext.
+
+        rc = Tss2_Sys_Initialize(sysContext, sysCtxSize, tctiContext, nullptr);
+        if (rc != TSS2_RC_SUCCESS) { return rc; }
 
         if (rc == TPM2_RC_INITIALIZE) { return TSS2_RC_SUCCESS; } // TPM already initialized.
         return rc;
@@ -288,4 +347,10 @@ extern "C" {
         free(sysContext);
     }
 
+}
+
+// main
+int main() {
+    TPM_setup_simulator();
+    std::cout << "TPM Version: " << TPM_get_version() << std::endl;
 }
