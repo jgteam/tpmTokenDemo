@@ -9,6 +9,7 @@ public interface NativeTPMInterface extends Library {
 
     int get_rc();
     String get_error_text(int rc);
+    String get_loaded_rsa_key_info();
     String TPM_get_version();
     String TPM_get_manufacturer();
     int TPM_setup_simulator();

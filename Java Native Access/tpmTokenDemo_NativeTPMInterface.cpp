@@ -54,6 +54,28 @@ extern "C" {
         return Tss2_RC_Decode(rc);
     }
 
+    TPM_API const char* get_loaded_rsa_key_info() {
+        std::stringstream ss;
+        ss << "rsaPublic:\n";
+        ss << "size: " << rsaPublic.size << "\n";
+        ss << "type: " << rsaPublic.publicArea.type << "\n";
+        ss << "nameAlg: " << rsaPublic.publicArea.nameAlg << "\n";
+        ss << "objectAttributes: " << rsaPublic.publicArea.objectAttributes << "\n";
+        ss << "authPolicy.size: " << rsaPublic.publicArea.authPolicy.size << "\n";
+        ss << "parameters.rsaDetail.symmetric.algorithm: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.algorithm << "\n";
+        ss << "parameters.rsaDetail.symmetric.keyBits.aes: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.keyBits.aes << "\n";
+        ss << "parameters.rsaDetail.symmetric.mode.aes: " << rsaPublic.publicArea.parameters.rsaDetail.symmetric.mode.aes << "\n";
+        ss << "parameters.rsaDetail.scheme.scheme: " << rsaPublic.publicArea.parameters.rsaDetail.scheme.scheme << "\n";
+        ss << "parameters.rsaDetail.keyBits: " << rsaPublic.publicArea.parameters.rsaDetail.keyBits << "\n";
+        ss << "parameters.rsaDetail.exponent: " << rsaPublic.publicArea.parameters.rsaDetail.exponent << "\n";
+        ss << "unique.rsa.size: " << rsaPublic.publicArea.unique.rsa.size << "\n";
+
+        std::string info = ss.str();
+        char* result = new char[info.size() + 1];
+        std::strcpy(result, info.c_str());
+        return result;
+    }
+
     TPM_API const char* TPM_get_version() {
         TPMS_CAPABILITY_DATA capabilityData;
         TPMI_YES_NO moreData;

@@ -153,7 +153,7 @@ public class AppShell {
 
         Button readRSAPublic = new Button(groupTPMActions, SWT.PUSH);
         readRSAPublic.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-        readRSAPublic.setText("Read RSA Public Key");
+        readRSAPublic.setText("Read RSA Public Key Metadata");
         readRSAPublic.setEnabled(false);
 
         Button endTPMSession = new Button(groupTPMActions, SWT.PUSH);
@@ -253,7 +253,6 @@ public class AppShell {
                     comboTPMSelector.setEnabled(false);
                     setupTPMUse.setEnabled(false);
                     setupKeys.setEnabled(true);
-                    readRSAPublic.setEnabled(true);
                     encryptToken.setEnabled(true);
                     decryptToken.setEnabled(true);
                     endTPMSession.setEnabled(true);
@@ -276,7 +275,24 @@ public class AppShell {
                     messageBox.setMessage("Error setting up Keys. Check log for details.");
                     messageBox.setText("Error");
                     messageBox.open();
+                } else {
+                    readRSAPublic.setEnabled(true);
                 }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        readRSAPublic.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                MessageBox messageBox = new MessageBox(shell, SWT.ICON_INFORMATION | SWT.OK);
+                messageBox.setMessage("[This Dialog will only show data, if the key is created in the same TPM session!]\n\nRSA Public Key:\n" + NativeTPMInterface.instance.get_loaded_rsa_key_info());
+                messageBox.setText("RSA Public Key");
+                messageBox.open();
             }
 
             @Override
