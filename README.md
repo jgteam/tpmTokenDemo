@@ -1,7 +1,6 @@
 # Tpm Demo App
 
 ![Maven Build](https://github.com/jgteam/tpmTokenDemo/actions/workflows/maven.yml/badge.svg)
-![CMake Build](https://github.com/jgteam/tpmTokenDemo/actions/workflows/cmake.yml/badge.svg)
 
 
 ! README.md is currently under construction !
