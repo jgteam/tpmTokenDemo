@@ -1,0 +1,32 @@
+name: CMake Build and Publish Artifacts
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install CMake
+        run: sudo apt-get install -y cmake
+
+      - name: Configure CMake
+        run: cmake -S "Java Native Access" -B "Java Native Access/cmake-build-debug"
+
+      - name: Build with CMake
+        run: cmake --build "Java Native Access/cmake-build-debug"
+
+      - name: Archive CMake artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tpm-api-dll
+          path: "Java Native Access/cmake-build-debug/TPM_API.dll"
