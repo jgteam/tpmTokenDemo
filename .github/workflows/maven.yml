@@ -30,4 +30,4 @@ jobs:
         with:
           name: maven-artifacts
           path: |
-            **/target/tpm-*.jar
+            **/target/tpmTokenDemo-*.jar
