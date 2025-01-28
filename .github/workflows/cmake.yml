@@ -23,7 +23,7 @@ jobs:
         run: cmake -S "Java Native Access" -B "Java Native Access/cmake-build-debug"
 
       - name: Build with CMake
-        run: cmake --build "Java Native Access/cmake-build-debug"
+        run: cmake --build "Java Native Access/cmake-build-debug" -D CMAKE_SOURCE_DIR="Java Native Access"
 
       - name: Archive CMake artifacts
         uses: actions/upload-artifact@v4
