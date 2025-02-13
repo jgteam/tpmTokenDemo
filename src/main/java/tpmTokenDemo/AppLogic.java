@@ -9,6 +9,8 @@ import org.eclipse.swt.widgets.MessageBox;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 
 public class AppLogic {
 
@@ -49,6 +51,14 @@ public class AppLogic {
                 Logger.log("AppLogic", "Error creating Primary Key: " + NativeTPMInterface.instance.get_error_text(rc));
                 return false;
             }
+
+            /*
+            rc = NativeTPMInterface.instance.TPM_create_primary_key(App.getPrimaryKeyHandle() + 10);
+            if( rc != 0 ) {
+                Logger.log("AppLogic", "Error creating second Primary Key: " + NativeTPMInterface.instance.get_error_text(rc));
+                return false;
+            }
+            */
 
             AppShell.buttonRefreshPersistentHandles.setForeground(App.getDisplay().getSystemColor(SWT.COLOR_RED));
 
@@ -146,6 +156,34 @@ public class AppLogic {
     }
 
     public static boolean retrieveToken() {
+        return retrieveToken(false, 1);
+    }
+
+    public static boolean retrieveToken(boolean measureTime, int count) {
+        if(count < 1) {
+            Logger.log("AppShell", "Invalid count.");
+            return false;
+        } else if(count == 1) {
+            return retrieveToken(measureTime, true);
+        } else {
+            boolean lastResult = false;
+            for(int i = 0; i < count; i++) {
+                lastResult = retrieveToken(measureTime, false);
+                Logger.log("AppShell", "Retrieval " + (i + 1) + " of " + count + ": " + (lastResult ? "Success" : "Failed"));
+
+                AppShell.decryptTokenMeasure.setText("Progress: " + (i + 1) + " of " + count);
+                AppShell.decryptTokenMeasure.getParent().layout();
+            }
+            MessageBox messageBox = new MessageBox(App.getShell(), SWT.ICON_INFORMATION | SWT.OK);
+            messageBox.setText("Measuring finished");
+            messageBox.setMessage("The measurement is finished. Please check the log or report for details.");
+            messageBox.open();
+            AppShell.decryptTokenMeasure.setText("Decrypt Token (measure time)");
+            return true;
+        }
+    }
+
+    public static boolean retrieveToken(boolean measureTime, boolean openDialog) {
         File tokenFile = new File(App.getTokenStoragePath());
         if(!tokenFile.exists()) {
             Logger.log("AppShell", "Token file not found.");
@@ -180,21 +218,42 @@ public class AppLogic {
             ciphertextParts[i] = tokenJson.withArray("encryptedTokenParts").get(i).asText();
         }
 
+        Instant start = null;
+        Instant end = null;
+
         StringBuilder plaintextBuilder = new StringBuilder();
         try {
+            if(measureTime) {
+                start = Instant.now();
+            }
             for (String part : ciphertextParts) {
                 plaintextBuilder.append(NativeTPMInterface.instance.TPM_decrypt(App.getRsaKeyHandle(), putBackCipher(part)));
+            }
+            if(measureTime) {
+                end = Instant.now();
             }
         } catch (Exception ex) {
             Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
             return false;
         }
 
+        if(measureTime && start != null && end != null) {
+            long timeElapsed = Duration.between(start, end).toMillis();
+            Logger.log("AppShell", "Decryption took " + timeElapsed + " ms.");
+            Logger.logTime(timeElapsed);
+            if(openDialog) {
+                MessageBox messageBox = new MessageBox(App.getShell(), SWT.ICON_INFORMATION | SWT.OK);
+                messageBox.setText("Decryption Time");
+                messageBox.setMessage("Decryption took " + timeElapsed + " ms.");
+                messageBox.open();
+            }
+        }
+
         String plaintext = plaintextBuilder.toString();
 
         Logger.log("AppShell", "Decrypted token: " + plaintext);
         TokenViewerDialog dialog = new TokenViewerDialog("Decrypted Token", plaintext.toCharArray());
-        dialog.open();
+        if(openDialog) dialog.open();
 
         return true;
     }

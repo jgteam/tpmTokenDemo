@@ -20,6 +20,7 @@ public interface NativeTPMInterface extends Library {
     int TPM_create_RSA_key(long parentHandle, long persistentHandle);
     String TPM_encrypt(long rsaHandle, String plantext);
     String TPM_decrypt(long rsaHandle, String ciphertext);
+    // String TPM_export_key(long rsaHandle, long parentHandle);
     void TPM_end_session();
 
 }

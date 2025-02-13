@@ -14,6 +14,8 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 
 public class AppShell {
 
@@ -26,6 +28,8 @@ public class AppShell {
     public static Label infoTPMPrimaryHandleLabel;
     public static Label infoTPMRSAHandleLabel;
     public static Label infoTokenLocationLabel;
+
+    public static Button decryptTokenMeasure;
 
     private AppShell() {
         // Prevent instantiation
@@ -186,7 +190,7 @@ public class AppShell {
 
         // TOKEN DECRYPT GROUP
         Group groupReadStored = new Group(shell, SWT.NONE);
-        groupReadStored.setLayout(new GridLayout(1, false));
+        groupReadStored.setLayout(new GridLayout(2, true));
         groupReadStored.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
         groupReadStored.setText("Token Retrieval");
 
@@ -195,12 +199,23 @@ public class AppShell {
         decryptToken.setText("Decrypt Token");
         decryptToken.setEnabled(false);
 
+        decryptTokenMeasure = new Button(groupReadStored, SWT.PUSH);
+        decryptTokenMeasure.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        decryptTokenMeasure.setText("Decrypt Token (measure time)");
+        decryptTokenMeasure.setEnabled(false);
 
+
+
+        // MEASURE REPORT BUTTON
+        Button buttonMeasureReport = new Button(shell, SWT.PUSH);
+        buttonMeasureReport.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
+        buttonMeasureReport.setText("View Time Measurements");
 
         // LOG BUTTON
         Button buttonOpenLog = new Button(shell, SWT.PUSH);
         buttonOpenLog.setLayoutData(new GridData(SWT.END, SWT.TOP, true, false, 2, 1));
         buttonOpenLog.setText("Open Log Viewer");
+
 
 
         // INFO LABEL
@@ -220,6 +235,13 @@ public class AppShell {
                 infoTPMPersitentHandlesLabel.getParent().layout();
                 groupAppSetup.getParent().layout();
                 AppShell.buttonRefreshPersistentHandles.setForeground(App.getDisplay().getSystemColor(SWT.COLOR_BLACK));
+
+                // Testing Export Key function
+                /*String keyExport = NativeTPMInterface.instance.TPM_export_key(App.getRsaKeyHandle(), App.getPrimaryKeyHandle() + 10);
+                MessageBox messageBox = new MessageBox(App.getShell(), SWT.ICON_INFORMATION | SWT.OK);
+                messageBox.setText("Exported RSA Key");
+                messageBox.setMessage("Exported RSA Key: " + keyExport);
+                messageBox.open();*/
             }
 
             @Override
@@ -255,6 +277,7 @@ public class AppShell {
                     setupKeys.setEnabled(true);
                     encryptToken.setEnabled(true);
                     decryptToken.setEnabled(true);
+                    decryptTokenMeasure.setEnabled(true);
                     endTPMSession.setEnabled(true);
                     buttonRefreshPersistentHandles.setEnabled(true);
                 }
@@ -310,6 +333,7 @@ public class AppShell {
                 readRSAPublic.setEnabled(false);
                 encryptToken.setEnabled(false);
                 decryptToken.setEnabled(false);
+                decryptTokenMeasure.setEnabled(false);
                 endTPMSession.setEnabled(false);
                 buttonRefreshPersistentHandles.setEnabled(false);
             }
@@ -362,10 +386,43 @@ public class AppShell {
             }
         });
 
+        decryptTokenMeasure.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                boolean success = AppLogic.retrieveToken(true, 100);
+                if(!success) {
+                    MessageBox messageBox = new MessageBox(shell, SWT.ICON_ERROR | SWT.OK);
+                    messageBox.setMessage("Error retrieving token. Check log for details.");
+                    messageBox.setText("Error");
+                    messageBox.open();
+                }
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
         buttonOpenLog.addSelectionListener(new SelectionListener() {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 LogDialog.open();
+            }
+
+            @Override
+            public void widgetDefaultSelected(SelectionEvent e) {
+                // Do nothing
+            }
+        });
+
+        buttonMeasureReport.addSelectionListener(new SelectionListener() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                MessageBox messageBox = new MessageBox(shell, SWT.ICON_INFORMATION | SWT.OK);
+                messageBox.setMessage(Logger.getTimeReport());
+                messageBox.setText("Time Measurements");
+                messageBox.open();
             }
 
             @Override
