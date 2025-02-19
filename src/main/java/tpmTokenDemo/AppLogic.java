@@ -125,12 +125,12 @@ public class AppLogic {
                 ciphertextParts[i] = NativeTPMInterface.instance.TPM_encrypt(App.getRsaKeyHandle(), tokenParts[i]);
                 ciphertextPartsReadable[i] = cleanUpCipher(ciphertextParts[i]);
             } catch (Exception ex) {
-                Logger.log("AppShell", "Error encrypting token: " + ex.getMessage());
+                Logger.log("AppLogic", "Error encrypting token: " + ex.getMessage());
                 return false;
             }
         }
 
-        Logger.log("AppShell", "Encrypted token: " + String.join(" ", ciphertextPartsReadable));
+        Logger.log("AppLogic", "Encrypted token: " + String.join(" ", ciphertextPartsReadable));
 
         // make a json object with the encrypted token using com.fasterxml.jackson.core
         // and write it to the file
@@ -148,7 +148,7 @@ public class AppLogic {
             // Write JSON to file
             mapper.writeValue(new File(App.getTokenStoragePath()), tokenJson);
         } catch (Exception ex) {
-            Logger.log("AppShell", "Error writing token to file: " + ex.getMessage());
+            Logger.log("AppLogic", "Error writing token to file: " + ex.getMessage());
             return false;
         }
 
@@ -161,7 +161,7 @@ public class AppLogic {
 
     public static boolean retrieveToken(boolean measureTime, int count) {
         if(count < 1) {
-            Logger.log("AppShell", "Invalid count.");
+            Logger.log("AppLogic", "Invalid count.");
             return false;
         } else if(count == 1) {
             return retrieveToken(measureTime, true);
@@ -169,7 +169,7 @@ public class AppLogic {
             boolean lastResult = false;
             for(int i = 0; i < count; i++) {
                 lastResult = retrieveToken(measureTime, false);
-                Logger.log("AppShell", "Retrieval " + (i + 1) + " of " + count + ": " + (lastResult ? "Success" : "Failed"));
+                Logger.log("AppLogic", "Retrieval " + (i + 1) + " of " + count + ": " + (lastResult ? "Success" : "Failed"));
 
                 AppShell.decryptTokenMeasure.setText("Progress: " + (i + 1) + " of " + count);
                 AppShell.decryptTokenMeasure.getParent().layout();
@@ -186,7 +186,7 @@ public class AppLogic {
     public static boolean retrieveToken(boolean measureTime, boolean openDialog) {
         File tokenFile = new File(App.getTokenStoragePath());
         if(!tokenFile.exists()) {
-            Logger.log("AppShell", "Token file not found.");
+            Logger.log("AppLogic", "Token file not found.");
             return false;
         }
 
@@ -195,21 +195,21 @@ public class AppLogic {
             ObjectMapper mapper = new ObjectMapper();
             tokenJson = (ObjectNode) mapper.readTree(tokenFile);
             if(tokenJson.get("schemaVersion").asInt() != 1) {
-                Logger.log("AppShell", "Token file has invalid schema version.");
+                Logger.log("AppLogic", "Token file has invalid schema version.");
                 return false;
             }
         } catch (Exception ex) {
-            Logger.log("AppShell", "Error reading token file: " + ex.getMessage());
+            Logger.log("AppLogic", "Error reading token file: " + ex.getMessage());
             return false;
         }
 
         if(tokenJson == null) {
-            Logger.log("AppShell", "Error reading token file: No JSON object found.");
+            Logger.log("AppLogic", "Error reading token file: No JSON object found.");
             return false;
         }
 
         if(tokenJson.get("rsaHandle").asLong() != App.getRsaKeyHandle()) {
-            Logger.log("AppShell", "Token file has different RSA Handle.");
+            Logger.log("AppLogic", "Token file has different RSA Handle.");
             return false;
         }
 
@@ -233,13 +233,13 @@ public class AppLogic {
                 end = Instant.now();
             }
         } catch (Exception ex) {
-            Logger.log("AppShell", "Error decrypting token: " + ex.getMessage());
+            Logger.log("AppLogic", "Error decrypting token: " + ex.getMessage());
             return false;
         }
 
         if(measureTime && start != null && end != null) {
             long timeElapsed = Duration.between(start, end).toMillis();
-            Logger.log("AppShell", "Decryption took " + timeElapsed + " ms.");
+            Logger.log("AppLogic", "Decryption took " + timeElapsed + " ms.");
             Logger.logTime(timeElapsed);
             if(openDialog) {
                 MessageBox messageBox = new MessageBox(App.getShell(), SWT.ICON_INFORMATION | SWT.OK);
@@ -251,7 +251,7 @@ public class AppLogic {
 
         String plaintext = plaintextBuilder.toString();
 
-        Logger.log("AppShell", "Decrypted token: " + plaintext);
+        Logger.log("AppLogic", "Decrypted token: " + plaintext);
         TokenViewerDialog dialog = new TokenViewerDialog("Decrypted Token", plaintext.toCharArray());
         if(openDialog) dialog.open();
 
