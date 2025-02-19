@@ -1,5 +1,7 @@
 package logger;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,10 +61,25 @@ public class Logger {
             median = times.get(n / 2);
         }
 
+        writeTimesToLog();
+
         return "[Decryption Times]\n   Number of times measured: " + n + "\n\n" +
                 "   Biggest time: " + max + "ms\n" +
                 "   Smallest time: " + min + "ms\n" +
                 "   Median time: " + median + "ms\n" +
-                "   Average time: " + sum / n + "ms";
+                "   Average time: " + sum / n + "ms\n\n\n" +
+                "Full list of times written to latestTimes.log";
+    }
+
+    private static void writeTimesToLog() {
+        try {
+            FileWriter writer = new FileWriter("latestTimes.log");
+            for (long time : times) {
+                writer.write(time + "\n");
+            }
+            writer.close();
+        } catch (IOException e) {
+            Logger.log("Logger", "Error writing times to log: " + e.getMessage());
+        }
     }
 }
