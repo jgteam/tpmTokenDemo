@@ -16,7 +16,6 @@
 
 #include "tpmTokenDemo_NativeTPMInterface.h"
 
-
 static TSS2_RC rc = TSS2_RC_SUCCESS;
 
 // Context and Session

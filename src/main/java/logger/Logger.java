@@ -1,3 +1,9 @@
+/**
+ * File: Logger.java
+ * Author: Jannis Günsche
+ * Description: This file is for the logging functionality of the application.
+ */
+
 package logger;
 
 import java.io.FileWriter;
@@ -5,36 +11,61 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The Logger class is for the logging functionality of the application.
+ */
 public class Logger {
 
     private static Logger instance = null;
 
+    // List of logged messages
     private static List<String> loggedMessages = new ArrayList<>();
 
     private Logger() {
         // Prevent instantiation
     }
 
+    /**
+     * Method for logging messages.
+     *
+     * @param className the class name of the calling class
+     * @param message   the message
+     */
     public static void log(String className, String message) {
         System.out.println("[" + className + "] " + message);
         loggedMessages.add("[" + className + "] " + message);
     }
 
+    /**
+     * Gets logged messages.
+     *
+     * @return the logged messages
+     */
     public static List<String> getLoggedMessages() {
         return loggedMessages;
     }
 
-    // Time Measurements
+    // Logic for Time Measurement below
 
+    // List of measured times
     private static List<Long> times = new ArrayList<>();
 
+    /**
+     * Logs time.
+     *
+     * @param time the time
+     */
     public static void logTime(long time) {
         System.out.println("Added Time: " + time + "ms");
         times.add(time);
     }
 
+    /**
+     * Gets time report.
+     *
+     * @return the time report
+     */
     public static String getTimeReport() {
-
         int n = times.size();
         if (n == 0) {
             return "No times measured";

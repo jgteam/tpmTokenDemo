@@ -1,11 +1,18 @@
+/**
+ * File: ConfigDialog.java
+ * Author: Jannis Günsche
+ * Description: This class contains the configuration dialog of the application.
+ */
 package tpmTokenDemo;
 
-import logger.Logger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
 
+/**
+ * The class ConfigDialog contains the configuration dialog of the application.
+ */
 public class ConfigDialog {
 
     private ConfigDialog() {
@@ -14,6 +21,9 @@ public class ConfigDialog {
 
     private static Button saveButton;
 
+    /**
+     * Open the dialog.
+     */
     public static void open() {
 
         Display display = App.getDisplay();
@@ -87,10 +97,6 @@ public class ConfigDialog {
             AppShell.updateConfigLabels();
             shell.close();
         });
-
-
-
-
 
 
         shell.open();

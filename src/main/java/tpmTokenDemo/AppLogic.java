@@ -1,3 +1,10 @@
+/**
+ * File: AppLogic.java
+ * Author: Jannis Günsche
+ * Description: This class contains the logic of the application.
+ */
+
+
 package tpmTokenDemo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,19 +15,28 @@ import org.eclipse.swt.widgets.MessageBox;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 
+/**
+ * This class contains the logic of the application.
+ */
 public class AppLogic {
 
     private AppLogic() {
         // Prevent instantiation
     }
 
+    /**
+     * Setup of the TPM.
+     *
+     * @param selectedTPM the selected tpm (= 0 for simulator, = 1 for real device)
+     * @return true if successful
+     */
     public static boolean setupTPM(int selectedTPM) {
         boolean useSimulator = selectedTPM == 0;
 
+        // return code
         int rc = 0;
 
         if(useSimulator) {
@@ -39,9 +55,15 @@ public class AppLogic {
         return true;
     }
 
+    /**
+     * Create the keys with the TPM.
+     *
+     * @return true if successful
+     */
     public static boolean createKeys() {
         int rc = 0;
 
+        // Create Primary Key
         rc = NativeTPMInterface.instance.TPM_check_if_handle_is_free(App.getPrimaryKeyHandle());
         if( rc == 0 ) {
             Logger.log("AppLogic", "Primary Key Handle is not in use. Creating new Primary Key...");
@@ -52,14 +74,6 @@ public class AppLogic {
                 return false;
             }
 
-            /*
-            rc = NativeTPMInterface.instance.TPM_create_primary_key(App.getPrimaryKeyHandle() + 10);
-            if( rc != 0 ) {
-                Logger.log("AppLogic", "Error creating second Primary Key: " + NativeTPMInterface.instance.get_error_text(rc));
-                return false;
-            }
-            */
-
             AppShell.buttonRefreshPersistentHandles.setForeground(App.getDisplay().getSystemColor(SWT.COLOR_RED));
 
         } else {
@@ -67,6 +81,7 @@ public class AppLogic {
             rc = 0; // Handle already exists. Resetting rc.
         }
 
+        // Create RSA Key
         rc = NativeTPMInterface.instance.TPM_check_if_handle_is_free(App.getRsaKeyHandle());
         if( rc == 0 ) {
             Logger.log("AppLogic", "RSA Key Handle is not in use. Creating new RSA Key...");
@@ -87,6 +102,12 @@ public class AppLogic {
         return true;
     }
 
+    /**
+     * Clean up of the cipher text for better readability and saving to file.
+     *
+     * @param input cipher text
+     * @return cleaned up cipher text
+     */
     public static String cleanUpCipher(String input) {
         StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < input.length(); i++) {
@@ -98,13 +119,26 @@ public class AppLogic {
         return stringBuilder.toString().toUpperCase();
     }
 
+    /**
+     * Put back cipher text to original format.
+     *
+     * @param input cleaned up cipher text
+     * @return original cipher text
+     */
     public static String putBackCipher(String input) {
         return input.replace(" ", "");
     }
 
+    /**
+     * Store token with TPM encryption in file.
+     *
+     * @param plaintext the plaintext
+     * @return true if successful
+     */
     public static boolean storeToken(String plaintext) {
 
-        int maxLen = 256; // mac length of Tss2_MU_TPM2B_PUBLIC_KEY_RSA_Marshal is 512
+        // Split the token into parts of better processing with TPM
+        int maxLen = 256; // max length of Tss2_MU_TPM2B_PUBLIC_KEY_RSA_Marshal is 512
         int len = plaintext.length();
         int parts = len / maxLen;
         if(len % maxLen != 0) {
@@ -118,6 +152,7 @@ public class AppLogic {
             tokenParts[i] = plaintext.substring(start, end);
         }
 
+        // encrypt token parts
         String[] ciphertextParts = new String[parts];
         String[] ciphertextPartsReadable = new String[parts];
         for(int i = 0; i < parts; i++) {
@@ -132,8 +167,7 @@ public class AppLogic {
 
         Logger.log("AppLogic", "Encrypted token: " + String.join(" ", ciphertextPartsReadable));
 
-        // make a json object with the encrypted token using com.fasterxml.jackson.core
-        // and write it to the file
+        // writing encrypted token to file
         try {
             ObjectMapper mapper = new ObjectMapper();
             ObjectNode tokenJson = mapper.createObjectNode();
@@ -155,17 +189,29 @@ public class AppLogic {
         return true;
     }
 
+    /**
+     * Overloading method for storing token with TPM encryption in file and default parameters. (No time measurement, no dialog)
+     *
+     * @return true if successful
+     */
     public static boolean retrieveToken() {
         return retrieveToken(false, 1);
     }
 
+    /**
+     * Overloading Method for retrieving a token. Can be used to measure the time of the decryption process and to open a dialog with the token.
+     *
+     * @param measureTime true if the time should be measured
+     * @param count       the count of retrievals
+     * @return true if successful
+     */
     public static boolean retrieveToken(boolean measureTime, int count) {
-        if(count < 1) {
+        if(count < 1) { // Invalid count
             Logger.log("AppLogic", "Invalid count.");
             return false;
-        } else if(count == 1) {
+        } else if(count == 1) { // Single retrieval
             return retrieveToken(measureTime, true);
-        } else {
+        } else { // Multiple retrievals
             boolean lastResult = false;
             for(int i = 0; i < count; i++) {
                 lastResult = retrieveToken(measureTime, false);
@@ -183,6 +229,13 @@ public class AppLogic {
         }
     }
 
+    /**
+     * Method for retrieving a token. Can be used to measure the time of the decryption process and to open a dialog with the token.
+     *
+     * @param measureTime true if the time should be measured
+     * @param openDialog  true if the token should be displayed in a dialog after retrieval
+     * @return true if successful
+     */
     public static boolean retrieveToken(boolean measureTime, boolean openDialog) {
         File tokenFile = new File(App.getTokenStoragePath());
         if(!tokenFile.exists()) {
@@ -221,6 +274,7 @@ public class AppLogic {
         Instant start = null;
         Instant end = null;
 
+        // decrypt token parts
         StringBuilder plaintextBuilder = new StringBuilder();
         try {
             if(measureTime) {
@@ -237,6 +291,7 @@ public class AppLogic {
             return false;
         }
 
+        // logging the time and showing a message box if openDialog is true
         if(measureTime && start != null && end != null) {
             long timeElapsed = Duration.between(start, end).toMillis();
             Logger.log("AppLogic", "Decryption took " + timeElapsed + " ms.");
@@ -253,11 +308,18 @@ public class AppLogic {
 
         Logger.log("AppLogic", "Decrypted token: " + plaintext);
         TokenViewerDialog dialog = new TokenViewerDialog("Decrypted Token", plaintext.toCharArray());
+        // show dialog if openDialog is true
         if(openDialog) dialog.open();
 
         return true;
     }
 
+    /**
+     * Decode and prettify token string.
+     *
+     * @param token the token
+     * @return the string
+     */
     public static String decodeAndPrettifyToken(char[] token) {
         // Expecting a valid 3-Part JWT token
 
@@ -297,6 +359,12 @@ public class AppLogic {
         }
     }
 
+    /**
+     * Hex string to ascii string.
+     *
+     * @param hexString the hex string
+     * @return the  ascii string
+     */
     public static String hexStringToAscii(String hexString) {
         StringBuilder output = new StringBuilder();
         for (int i = 0; i < hexString.length(); i += 2) {

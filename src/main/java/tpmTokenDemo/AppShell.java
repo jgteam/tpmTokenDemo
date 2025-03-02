@@ -13,28 +13,50 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-
+/**
+ * The class AppShell contains the main UI window of the application.
+ */
 public class AppShell {
 
     private static Shell shell = null;
 
-    // UI elements
+    /**
+     * The constant buttonRefreshPersistentHandles.
+     */
     public static Button buttonRefreshPersistentHandles;
+    /**
+     * The constant infoTPMPersitentHandlesLabel.
+     */
     public static Label infoTPMPersitentHandlesLabel;
 
+    /**
+     * The constant infoTPMPrimaryHandleLabel.
+     */
     public static Label infoTPMPrimaryHandleLabel;
+    /**
+     * The constant infoTPMRSAHandleLabel.
+     */
     public static Label infoTPMRSAHandleLabel;
+    /**
+     * The constant infoTokenLocationLabel.
+     */
     public static Label infoTokenLocationLabel;
 
+    /**
+     * The constant decryptTokenMeasure.
+     */
     public static Button decryptTokenMeasure;
 
     private AppShell() {
         // Prevent instantiation
     }
 
+    /**
+     * Gets shell.
+     *
+     * @param display the display
+     * @return the shell
+     */
     public static Shell getShell(Display display) {
 
         if (shell != null) {
@@ -235,13 +257,6 @@ public class AppShell {
                 infoTPMPersitentHandlesLabel.getParent().layout();
                 groupAppSetup.getParent().layout();
                 AppShell.buttonRefreshPersistentHandles.setForeground(App.getDisplay().getSystemColor(SWT.COLOR_BLACK));
-
-                // Testing Export Key function
-                /*String keyExport = NativeTPMInterface.instance.TPM_export_key(App.getRsaKeyHandle(), App.getPrimaryKeyHandle() + 10);
-                MessageBox messageBox = new MessageBox(App.getShell(), SWT.ICON_INFORMATION | SWT.OK);
-                messageBox.setText("Exported RSA Key");
-                messageBox.setMessage("Exported RSA Key: " + keyExport);
-                messageBox.open();*/
             }
 
             @Override
@@ -434,6 +449,9 @@ public class AppShell {
         return shell;
     }
 
+    /**
+     * Update config labels.
+     */
     public static void updateConfigLabels() {
         infoTPMPrimaryHandleLabel.setText("0x" + Long.toHexString(App.getPrimaryKeyHandle()).toUpperCase());
         infoTPMRSAHandleLabel.setText("0x" + Long.toHexString(App.getRsaKeyHandle()).toUpperCase());
